@@ -57,16 +57,14 @@ library(tidyjson)
 # 2. Metodología y fuentes de datos
 
 ## 2.1. Fuentes de datos
+
 Aquí tienes el párrafo redactado de forma académica y justificada, listo para pegarlo en el apartado de **Metodología** de tu Rmd.
 
-***
+------------------------------------------------------------------------
 
 **Justificación del uso de importación local para las fuentes de la OMS y el NCI-GDC**
 
-Para la obtención de los datos clínicos del NCI Genomic Data Commons (GDC) y los datos epidemiológicos de prevalencia de obesidad de la Organización Mundial de la Salud (OMS), se ha optado por la descarga e importación local de sus respectivos archivos (`.json` y `.csv`), en lugar de realizar una conexión directa a sus APIs. Esta decisión metodológica responde a tres motivos principales. 
-En primer lugar, ambas plataformas oficiales presentan una alta inestabilidad en sus servicios web, lo que provocaba fallos recurrentes de timeout o bloqueos durante las peticiones. 
-En segundo lugar, extraer los datos de estas APIs de forma programática habría requerido el uso de librerías de red externas (como `httr2`), las cuales no forman parte del temario ni de las herramientas trabajadas en la asignatura. 
-Por último, y en relación con lo anterior, el paquete `tidyjson` enseñado en clase está diseñado exclusivamente para procesar y aplanar estructuras JSON ya cargadas en el entorno de R, careciendo de funcionalidades para hacer peticiones HTTP. Por tanto, para garantizar la reproducibilidad del análisis y ceñirnos estrictamente a los paquetes y metodologías del curso (`readr` y `jsonlite`), se ha priorizado la robustez de trabajar con una copia local de los ficheros oficiales descargados previamente desde el portal web del GDC y de la OMS.
+Para la obtención de los datos clínicos del NCI Genomic Data Commons (GDC) y los datos epidemiológicos de prevalencia de obesidad de la Organización Mundial de la Salud (OMS), se ha optado por la descarga e importación local de sus respectivos archivos (`.json` y `.csv`), en lugar de realizar una conexión directa a sus APIs. Esta decisión metodológica responde a tres motivos principales. En primer lugar, ambas plataformas oficiales presentan una alta inestabilidad en sus servicios web, lo que provocaba fallos recurrentes de timeout o bloqueos durante las peticiones. En segundo lugar, extraer los datos de estas APIs de forma programática habría requerido el uso de librerías de red externas (como `httr2`), las cuales no forman parte del temario ni de las herramientas trabajadas en la asignatura. Por último, y en relación con lo anterior, el paquete `tidyjson` enseñado en clase está diseñado exclusivamente para procesar y aplanar estructuras JSON ya cargadas en el entorno de R, careciendo de funcionalidades para hacer peticiones HTTP. Por tanto, para garantizar la reproducibilidad del análisis y ceñirnos estrictamente a los paquetes y metodologías del curso (`readr` y `jsonlite`), se ha priorizado la robustez de trabajar con una copia local de los ficheros oficiales descargados previamente desde el portal web del GDC y de la OMS.
 
 ### 2.1.1. Importación de las fuentes
 
@@ -129,7 +127,7 @@ cat("Columnas OMS:", paste(names(oms_raw)[1:5], collapse = ", "), "...\n")
 
 ## 3.1. Limpieza de cBioPortal
 
-*(La API devuelve los datos en formato "largo" (una fila por atributo). Hay que pivotarlos a formato "ancho").*
+La API de cBioPortal devuelve la información clínica en un **formato "largo" (long format),** donde cada fila representa un único atributo de un paciente (por ejemplo, una fila para la edad y otra para el subtipo tumoral). Para poder cruzar estos datos de manera eficiente con las otras fuentes, **es necesario reorganizar la estructura a un formato "ancho" (wide format)**, de modo que obtengamos una única **fila por paciente y una columna para cada variable clínica**. Para ello, se emplea la función pivot_wider() del paquete tidyr.
 
 ```{r limpieza-cbioportal}
 cbio_wide <- cbio_raw %>%
@@ -145,19 +143,19 @@ glimpse(cbio_wide)
 
 ## 3.2. Limpieza de la OMS
 
-*(Filtramos para quedarnos solo con mujeres, el año más reciente, y seleccionamos/renombramos las columnas clave).*
+A la hora de procesar los datos de prevalencia de obesidad obtenidos del Global Health Observatory de la OMS, se ha aplicado un filtro para conservar exclusivamente los registros correspondientes al sexo femenino **(Dim1ValueCode == "SEX_FMLE").** Esta decisión es puramente metodológica y está directamente alineada con la naturaleza de nuestro estudio, **centrado en el cáncer de mama**. Dado que esta **patología afecta de manera casi exclusiva a las mujeres**, resulta biológicamente incoherente y estadísticamente sesgado cruzar la información clínica y genómica de nuestras pacientes (procedentes de TCGA-BRCA y del GDC) con tasas de obesidad poblacional que incluyan a los hombres o que mezclen ambos sexos. Al restringir la variable de la OMS al género femenino, garantizamos que la variable contextual (el factor de riesgo de la obesidad) sea demográficamente comparable con nuestra cohorte de estudio, permitiendo un análisis ecológico mucho más riguroso y significativo.
 
 ```{r limpieza-oms}
 oms_obesidad <- oms_raw %>%
   filter(
-    Dim1ValueCode == "SEX_FMLE",  # Solo sexo femenino
-    IsLatestYear == TRUE          # Solo el año más reciente (2024)
+    Dim1ValueCode == "SEX_FMLE",  
+    IsLatestYear == TRUE  # Solo el año más reciente (2024)
   ) %>%
   select(
-    iso3  = SpatialDimValueCode,  # Código ISO-3 del país
-    pais  = Location,             # Nombre del país
-    year  = Period,               # Año del dato
-    valor = FactValueNumeric      # Porcentaje de obesidad
+    iso3  = SpatialDimValueCode,  #Código ISO-3 del país
+    pais  = Location,             
+    year  = Period, 
+    valor = FactValueNumeric #Porcentaje de obesidad
   )
 
 glimpse(oms_obesidad)
@@ -232,31 +230,37 @@ datos_cruzados <- cbio_wide %>%
 *(Aquí irían los gráficos y tablas. Los dejo como estaban en tu estructura para que los completes).*
 
 ## 4.1. Análisis descriptivo
+
 ```{r descriptivos}
 # Chunk 6: tablas resumen con group_by + summarise
 ```
 
 ## 4.2. Inestabilidad genómica por subtipo
+
 ```{r grafico-fga}
 # Chunk 7: boxplot FGA por subtipo
 ```
 
 ## 4.3. Medicina de precisión en acción: tratamientos por subtipo
+
 ```{r grafico-tratamientos}
 # Chunk 8: barras agrupadas hormonoterapia vs quimioterapia
 ```
 
 ## 4.4. Disparidades raciales en la distribución de subtipos
+
 ```{r grafico-razas}
 # Chunk 9: barras apiladas al 100% por raza
 ```
 
 ## 4.5. Edad, TMB y estado vital
+
 ```{r grafico-edad-tmb}
 # Chunk 10: scatter edad vs TMB con color por subtipo
 ```
 
 ## 4.6. Contexto mundial: obesidad femenina y subtipos
+
 ```{r grafico-mapa}
 # Chunk 11: mapa mundial o scatter obesidad vs proporción Basal-like
 ```
@@ -264,15 +268,18 @@ datos_cruzados <- cbio_wide %>%
 # 5. Discusión
 
 ## 5.1. Interpretación de los hallazgos
+
 *(Conectar resultados con la pregunta de investigación.)*
 
 ## 5.2. Limitaciones
+
 - **Sesgo ecológico:** datos agregados a nivel poblacional (OMS) → falacia ecológica.
 - **Variables de confusión no incluidas:** acceso a cribado, estadio al diagnóstico, factores socioeconómicos.
 - **Categorización racial:** categorías administrativas que agrupan poblaciones heterogéneas.
 - **Datos de tratamiento:** registro retrospectivo, posible infranotificación.
 
 ## 5.3. Conclusiones
+
 *(2–3 líneas: ¿se cumple el objetivo general? ¿qué aporta el cruce de fuentes?)*
 
 # 6. Reproducibilidad
