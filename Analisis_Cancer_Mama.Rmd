@@ -1,5 +1,286 @@
 ---
-title: "Analisis_Cancer_Mama"
-output: html_document
+title:    | 
+ | Genómica y medicina de precisión 
+ | en cáncer de mama #8235
+ | Gº Ingeniería de la Salud
+
+author: | 
+ | <br>
+ | **Rosa Isabel Ciudad Garcia**
+ | *[E-mail](mailto:rosa@ubu.es)* // 
+ |
+ | **Maroua Zaroual Houbbi**
+ | *[E-mail](mailto:maroua@ubu.es)* // 
+ |
+ | **Maryam El Haouzi**
+ | *[E-mail](mailto:maryam@ubu.es)* // 
+
+date: |
+ | <br>
+ | "`r paste0("5º Semestre / 3º Curso ", format(Sys.Date(), "%Y"), "-", as.integer(format(Sys.Date(), "%Y")) + 1)`"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_float: yes
+    toc_depth: 6
+  pdf_document:
+    toc: yes
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE)
+
+library(tidyverse)
+library(jsonlite)
+library(tidyjson)
+```
+
+# 1. Introducción
+
+## 1.1. Contexto y motivación
+
+*(Párrafo: el cáncer de mama no es una sola enfermedad; la medicina de precisión busca tratar según el perfil molecular. Justificar la relevancia.)*
+
+## 1.2. Pregunta de investigación
+
+*(Formular la pregunta principal: ¿qué genes se expresan diferencialmente entre subtipos PAM50 y cómo se relacionan con la agresividad tumoral?)*
+
+## 1.3. Objetivos
+
+- **Objetivo general:** ...
+- **Objetivos específicos:**
+  1.  ...
+  2.  ...
+  3.  ...
+
+# 2. Metodología y fuentes de datos
+
+## 2.1. Fuentes de datos
+Aquí tienes el párrafo redactado de forma académica y justificada, listo para pegarlo en el apartado de **Metodología** de tu Rmd.
+
+***
+
+**Justificación del uso de importación local para las fuentes de la OMS y el NCI-GDC**
+
+Para la obtención de los datos clínicos del NCI Genomic Data Commons (GDC) y los datos epidemiológicos de prevalencia de obesidad de la Organización Mundial de la Salud (OMS), se ha optado por la descarga e importación local de sus respectivos archivos (`.json` y `.csv`), en lugar de realizar una conexión directa a sus APIs. Esta decisión metodológica responde a tres motivos principales. 
+En primer lugar, ambas plataformas oficiales presentan una alta inestabilidad en sus servicios web, lo que provocaba fallos recurrentes de timeout o bloqueos durante las peticiones. 
+En segundo lugar, extraer los datos de estas APIs de forma programática habría requerido el uso de librerías de red externas (como `httr2`), las cuales no forman parte del temario ni de las herramientas trabajadas en la asignatura. 
+Por último, y en relación con lo anterior, el paquete `tidyjson` enseñado en clase está diseñado exclusivamente para procesar y aplanar estructuras JSON ya cargadas en el entorno de R, careciendo de funcionalidades para hacer peticiones HTTP. Por tanto, para garantizar la reproducibilidad del análisis y ceñirnos estrictamente a los paquetes y metodologías del curso (`readr` y `jsonlite`), se ha priorizado la robustez de trabajar con una copia local de los ficheros oficiales descargados previamente desde el portal web del GDC y de la OMS.
+
+### 2.1.1. Importación de las fuentes
+
+```{r importacion-fuentes}
+# ==============================================================================
+# IMPORTACIÓN DE LAS TRES FUENTES
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. cBioPortal — Datos clínicos (Formato largo desde API)
+# ------------------------------------------------------------------------------
+url_cbio <- "https://www.cbioportal.org/api/studies/brca_tcga_pan_can_atlas_2018/clinical-data?clinicalDataType=PATIENT"
+
+cbio_raw <- tryCatch({
+  fromJSON(url_cbio, simplifyVector = TRUE) %>% as_tibble()
+}, error = function(e) {
+  message("Fallo en la API de cBioPortal. Usando archivo local de emergencia...")
+  # EMERGENCIA LOCAL:
+  # read_tsv("INPUT/DATA/brca_tcga_clinical.tsv", show_col_types = FALSE)
+})
+
+# ------------------------------------------------------------------------------
+# 2. NCI GDC — Registros clínicos (JSON complejo desde API)
+# ------------------------------------------------------------------------------
+
+
+gdc_raw <- fromJSON("INPUT/DATA/clinical_tcga_brca.json", flatten = TRUE) %>% as_tibble()
+
+
+# ------------------------------------------------------------------------------
+# 3. OMS GHO — Prevalencia de obesidad femenina (Importación LOCAL en CSV)
+# ------------------------------------------------------------------------------
+oms_raw <- read_csv(
+  file = "INPUT/DATA/obesidad_oms.csv",
+  show_col_types = FALSE
+)
+```
+
+```{r resumen-dimensiones}
+# Resumen de dimensiones para comprobar que todo se ha cargado
+cat("cBioPortal :", nrow(cbio_raw), "filas x", ncol(cbio_raw), "columnas\n")
+cat("GDC JSON   :", nrow(gdc_raw),  "filas x", ncol(gdc_raw),  "columnas\n")
+cat("OMS CSV    :", nrow(oms_raw),  "filas x", ncol(oms_raw),  "columnas\n")
+```
+
+```{r verificacion-columnas}
+# Verificación rápida de columnas clave
+cat("Columnas cBioPortal:", paste(names(cbio_raw)[1:5], collapse = ", "), "...\n")
+cat("Columnas GDC:", paste(names(gdc_raw)[1:5], collapse = ", "), "...\n")
+cat("Columnas OMS:", paste(names(oms_raw)[1:5], collapse = ", "), "...\n")
+```
+
+## 2.2. Flujo de análisis
+
+*(Diagrama o lista numerada: importación → limpieza/desanidado → cruce → análisis descriptivo → gráficos → exportación.)*
+
+# 3. Procesamiento y limpieza
+
+*(En esta sección transformamos los datos crudos importados en tablas limpias y listas para el cruce).*
+
+## 3.1. Limpieza de cBioPortal
+
+*(La API devuelve los datos en formato "largo" (una fila por atributo). Hay que pivotarlos a formato "ancho").*
+
+```{r limpieza-cbioportal}
+cbio_wide <- cbio_raw %>%
+  select(patientId, clinicalAttributeId, value) %>%
+  pivot_wider(
+    names_from  = clinicalAttributeId,
+    values_from = value,
+    values_fn   = first
+  )
+
+glimpse(cbio_wide)
+```
+
+## 3.2. Limpieza de la OMS
+
+*(Filtramos para quedarnos solo con mujeres, el año más reciente, y seleccionamos/renombramos las columnas clave).*
+
+```{r limpieza-oms}
+oms_obesidad <- oms_raw %>%
+  filter(
+    Dim1ValueCode == "SEX_FMLE",  # Solo sexo femenino
+    IsLatestYear == TRUE          # Solo el año más reciente (2024)
+  ) %>%
+  select(
+    iso3  = SpatialDimValueCode,  # Código ISO-3 del país
+    pais  = Location,             # Nombre del país
+    year  = Period,               # Año del dato
+    valor = FactValueNumeric      # Porcentaje de obesidad
+  )
+
+glimpse(oms_obesidad)
+```
+
+## 3.3. Desanidado del JSON del GDC
+
+*(El GDC trae listas anidadas (`diagnoses`, `follow_ups`). Usamos `unnest()` para extraer tratamientos y biomarcadores IHC).*
+
+```{r desanidado-gdc}
+# A) Tratamientos: diagnoses -> treatments
+gdc_tratamientos <- gdc_raw %>%
+  select(submitter_id, diagnoses) %>%
+  unnest(diagnoses, keep_empty = TRUE) %>%
+  unnest(treatments, keep_empty = TRUE) %>%
+  group_by(submitter_id) %>%
+  summarise(
+    tipo_terapia           = paste(unique(na.omit(treatment_type)), collapse = " | "),
+    farmacos               = paste(unique(na.omit(therapeutic_agents)), collapse = ", "),
+    recibio_hormonoterapia = if_else(any(treatment_type == "Hormone Therapy", na.rm = TRUE), "Sí", "No"),
+    recibio_quimioterapia  = if_else(any(treatment_type == "Chemotherapy", na.rm = TRUE), "Sí", "No"),
+    .groups = "drop"
+  )
+
+# B) Biomarcadores IHC: follow_ups -> molecular_tests
+gdc_biomarcadores <- gdc_raw %>%
+  select(submitter_id, follow_ups) %>%
+  unnest(follow_ups, keep_empty = TRUE) %>%
+  unnest(molecular_tests, keep_empty = TRUE) %>%
+  filter(
+    gene_symbol %in% c("ESR1", "PGR", "ERBB2"),
+    molecular_analysis_method == "IHC"
+  ) %>%
+  group_by(submitter_id, gene_symbol) %>%
+  summarise(resultado_ihc = first(na.omit(test_result)), .groups = "drop") %>%
+  pivot_wider(
+    names_from  = gene_symbol,
+    values_from = resultado_ihc,
+    names_prefix = "IHC_"
+  )
+
+glimpse(gdc_tratamientos)
+glimpse(gdc_biomarcadores)
+```
+
+## 3.4. Cruce de las tres fuentes
+
+*(Unimos cBioPortal con GDC por `Patient ID == submitter_id`, y luego añadimos la obesidad cruzando por país).*
+
+```{r cruce-fuentes}
+datos_cruzados <- cbio_wide %>%
+  inner_join(gdc_tratamientos, by = c("Patient ID" = "submitter_id")) %>%
+  left_join(gdc_biomarcadores, by = c("Patient ID" = "submitter_id")) %>%
+  filter(!is.na(Subtype)) %>%
+  mutate(
+    Subtipo = recode(
+      Subtype,
+      "BRCA_LumA"   = "Luminal A",
+      "BRCA_LumB"   = "Luminal B",
+      "BRCA_Basal"  = "Basal-like",
+      "BRCA_Her2"   = "HER2-enriquecido",
+      "BRCA_Normal" = "Normal-like"
+    )
+  )
+
+# NOTA: El cruce con la OMS se hará en la fase de resultados si es necesario,
+# ya que el GDC no trae el país directamente en este nivel, sino en 'demographic'.
+```
+
+# 4. Resultados
+
+*(Aquí irían los gráficos y tablas. Los dejo como estaban en tu estructura para que los completes).*
+
+## 4.1. Análisis descriptivo
+```{r descriptivos}
+# Chunk 6: tablas resumen con group_by + summarise
+```
+
+## 4.2. Inestabilidad genómica por subtipo
+```{r grafico-fga}
+# Chunk 7: boxplot FGA por subtipo
+```
+
+## 4.3. Medicina de precisión en acción: tratamientos por subtipo
+```{r grafico-tratamientos}
+# Chunk 8: barras agrupadas hormonoterapia vs quimioterapia
+```
+
+## 4.4. Disparidades raciales en la distribución de subtipos
+```{r grafico-razas}
+# Chunk 9: barras apiladas al 100% por raza
+```
+
+## 4.5. Edad, TMB y estado vital
+```{r grafico-edad-tmb}
+# Chunk 10: scatter edad vs TMB con color por subtipo
+```
+
+## 4.6. Contexto mundial: obesidad femenina y subtipos
+```{r grafico-mapa}
+# Chunk 11: mapa mundial o scatter obesidad vs proporción Basal-like
+```
+
+# 5. Discusión
+
+## 5.1. Interpretación de los hallazgos
+*(Conectar resultados con la pregunta de investigación.)*
+
+## 5.2. Limitaciones
+- **Sesgo ecológico:** datos agregados a nivel poblacional (OMS) → falacia ecológica.
+- **Variables de confusión no incluidas:** acceso a cribado, estadio al diagnóstico, factores socioeconómicos.
+- **Categorización racial:** categorías administrativas que agrupan poblaciones heterogéneas.
+- **Datos de tratamiento:** registro retrospectivo, posible infranotificación.
+
+## 5.3. Conclusiones
+*(2–3 líneas: ¿se cumple el objetivo general? ¿qué aporta el cruce de fuentes?)*
+
+# 6. Reproducibilidad
+
+```{r session-info}
+sessionInfo()
+```
+
+# 7. Referencias
+
+*(Bibliografía en formato APA: TCGA, cBioPortal, NCI-GDC, OMS GHO, DESeq2, etc.)*
