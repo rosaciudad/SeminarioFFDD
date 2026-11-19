@@ -7,7 +7,7 @@ title:    |
 author: | 
  | <br>
  | **Rosa Isabel Ciudad Garcia**
- | *[E-mail](mailto:rosa@ubu.es)* // 
+ | *[E-mail](mailto:rcg1022@alu.ubu.es)* // 
  |
  | **Maroua Zaroual Houbbi**
  | *[E-mail](mailto:maroua@ubu.es)* // 
@@ -27,6 +27,39 @@ output:
   pdf_document:
     toc: yes
 ---
+
+```{r fondo-html, echo=FALSE, results='asis'}
+img_uri <- knitr::image_uri("INPUT/IMAGES/fondo.jpg")
+cat(sprintf("
+<style>
+body {
+  background-image: url('%s');
+  background-size: cover;
+  background-attachment: fixed;
+  background-position: center;
+}
+.main-container {
+  background-color: rgba(255, 255, 255, 0.65);
+  padding: 30px;
+  border-radius: 10px;
+}
+h1.title, h1 {
+  color: #6a1b4d;
+  font-weight: bold;
+}
+h2, h3, h4 {
+  color: #9c2766;
+}
+.list-group-item.active, .list-group-item.active:hover {
+  background-color: #801e5b;
+  border-color: #801e5b;
+}
+</style>
+", img_uri))
+```
+
+
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE)
@@ -127,7 +160,6 @@ cat("Columnas OMS:", paste(names(oms_raw)[1:5], collapse = ", "), "...\n")
 
 ## 3.1. Limpieza de cBioPortal
 
-
 ```{r limpieza-cbioportal}
 cbio_wide <- cbio_raw %>%
   group_by(patientId) %>%
@@ -221,14 +253,15 @@ str(datos_cruzados)
 
 # 4. Resultados
 
-A continuación se van a mostrar una serie de gráficos y tablas que responden a las preguntas antes mencionadas. 
+A continuación se van a mostrar una serie de gráficos y tablas que responden a las preguntas antes mencionadas.
 
 ## 4.1. Análisis descriptivo
 
 Se van a realizar una serie de tablas que resumen la información con el objetivo de **preparar los datos para la generación de visualizaciones**.
 
-### Tabla 1:  Tabla por subtipo molecular PAM50.
-```{r descriptivos}
+### Tabla 1: Tabla por subtipo molecular PAM50.
+
+```{r descriptivos-subtipo}
 tabla_subtipos <- datos_cruzados %>%
   mutate(
     edad                = as.numeric(edad),
@@ -249,8 +282,10 @@ tabla_subtipos <- datos_cruzados %>%
 tabla_subtipos
 
 ```
-### Tabla 2:  Distribución de subtipos por raza
-```{r descriptivos}
+
+### Tabla 2: Distribución de subtipos por raza
+
+```{r descriptivos-raza}
 tabla_razas <- datos_cruzados %>%
   filter(
     raza == "White" | 
@@ -266,9 +301,10 @@ tabla_razas <- datos_cruzados %>%
 
 tabla_razas
 ```
-### Tabla 3:  Distribución de subtipos por raza
 
-```{r descriptivos}
+### Tabla 3: Clínica gdc
+
+```{r descriptivos-gdc}
 tabla_clinica_gdc <- datos_cruzados %>%
   group_by(Subtipo) %>%
   summarise(
@@ -280,7 +316,6 @@ tabla_clinica_gdc <- datos_cruzados %>%
 
 tabla_clinica_gdc
 ```
-
 
 ## 4.2. Inestabilidad genómica por subtipo
 
