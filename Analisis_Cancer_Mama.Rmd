@@ -98,39 +98,63 @@ Para la obtención de los datos clínicos del NCI Genomic Data Commons (GDC) y l
 
 ### 2.1.1. Importación de las fuentes
 
-```{r importacion-fuentes}
-# ==============================================================================
-# IMPORTACIÓN DE LAS TRES FUENTES
-# ==============================================================================
+#### Importación de datos clínicos y genómicos desde cBioPortal
 
-# ------------------------------------------------------------------------------
-# 1. cBioPortal — Datos clínicos (Formato largo desde API)
-# ------------------------------------------------------------------------------
-url_cbio <- "https://www.cbioportal.org/api/studies/brca_tcga_pan_can_atlas_2018/clinical-data?clinicalDataType=PATIENT"
+En este bloque se realiza la extracción programática de los datos clínicos del estudio **TCGA Pan-Cancer Atlas de Cáncer de Mama (`brca_tcga_pan_can_atlas_2018`)** conectando directamente con la API REST pública de cBioPortal mediante el paquete `cbioportalR`. Tras establecer la conexión con la instancia pública sin necesidad de autenticación (`set_cbioportal_db("public")`), se descargan tanto los atributos a nivel de paciente como los biomarcadores a nivel de muestra. Dado que la API devuelve la información estructurada en formato largo (pares de atributo-valor por fila), se emplean funciones del `tidyverse` (`distinct()` y `pivot_wider()`) para transformar y reestructurar la tabla a un formato ancho con una única fila por paciente y una columna por cada variable clínica o molecular. Por último, se deja preparada una ruta alternativa comentada (`read_tsv()`) como respaldo reproducible en caso de fallo de conexión con el servidor remoto.
 
-cbio_raw <- tryCatch({
-  fromJSON(url_cbio, simplifyVector = TRUE) %>% as_tibble()
-}, error = function(e) {
-  message("Fallo en la API de cBioPortal. Usando archivo local de emergencia...")
-  # EMERGENCIA LOCAL:
-  # read_tsv("INPUT/DATA/brca_tcga_clinical.tsv", show_col_types = FALSE)
-})
+```{r Importaciones de cbioPortal}
+# Instalación de paquete
+#install.packages("cbioportalR")
 
-# ------------------------------------------------------------------------------
-# 2. NCI GDC — Registros clínicos (JSON complejo desde API)
-# ------------------------------------------------------------------------------
+# Libreria especifica
+library(cbioportalR)
+# 1. Conectar a la base pública (no requiere token)
+set_cbioportal_db("public")
 
+# 2. Descargar datos clínicos de pacientes y muestras del estudio TCGA-BRCA
+cbio_raw <- get_clinical_by_study(study_id = "brca_tcga_pan_can_atlas_2018") %>%
+  select(patientId, clinicalAttributeId, value) %>%
+  distinct() %>%
+  pivot_wider(names_from = clinicalAttributeId, values_from = value)
+names(cbio_raw)
 
-gdc_raw <- fromJSON("INPUT/DATA/clinical_tcga_brca.json", flatten = TRUE) %>% as_tibble()
+# EMERGENCIA LOCAL:
+  # cbio_raw <- read_tsv("INPUT/DATA/brca_tcga_clinical.tsv", show_col_types = FALSE)
 
+```
+#### Importación de datos clínicos, tratamientos y seguimientos desde NCI GDC
 
-# ------------------------------------------------------------------------------
-# 3. OMS GHO — Prevalencia de obesidad femenina (Importación LOCAL en CSV)
-# ------------------------------------------------------------------------------
-oms_raw <- read_csv(
-  file = "INPUT/DATA/obesidad_oms.csv",
-  show_col_types = FALSE
-)
+En este bloque se accede de forma programática al portal **Genomic Data Commons (GDC)** del Instituto Nacional del Cáncer (NCI) utilizando el paquete oficial `GenomicDataCommons` de Bioconductor. A través del *endpoint* `cases()`, se construye una consulta filtrada exclusivamente para la cohorte de cáncer de mama (**`TCGA-BRCA`**) y se expanden de manera anidada los bloques de información demográfica (`demographic`), diagnósticos (`diagnoses`), pautas terapéuticas (`diagnoses.treatments`) y seguimientos clínicos (`follow_ups`). Posteriormente, la respuesta paginada obtenida de la API se transforma en un objeto tabular (`tibble`) mediante `as_tibble()` para facilitar su inspección y posterior desanidado, manteniendo además una línea comentada con `fromJSON()` como plan de respaldo local en caso de caída de red.
+
+```{r Importaciones de NCI GDC}
+
+#Instalación del paquete(una unica ejecucion)
+#install.packages("BiocManager")
+#BiocManager::install("GenomicDataCommons")
+
+#Importacion
+library(GenomicDataCommons)
+
+# 1. Construimos y ejecutamos la consulta al endpoint de casos (pacientes)
+gdc_resultados <- cases() %>%
+  filter(~ project.project_id == "TCGA-BRCA") %>%
+  expand(c("demographic", "diagnoses", "diagnoses.treatments", "follow_ups")) %>%
+
+# 2. Convertimos la respuesta en un tibble/data.frame manejable
+gdc_raw <- as_tibble(gdc_resultados)
+
+# Verificamos cuántos pacientes (filas) y bloques de variables hemos descargado
+dim(gdc_raw)
+names(gdc_raw)
+#EMERGENCIA LOCAL:
+#gdc_raw <- fromJSON("INPUT/DATA/clinical_tcga_brca.json", flatten = TRUE) %>% as_tibble()
+
+```
+
+```{r Importaciones de la OMS}
+
+oms_raw <- read_csv(file = "INPUT/DATA/obesidad_oms.csv", show_col_types = FALSE)
+
 ```
 
 ```{r resumen-dimensiones}
@@ -159,16 +183,21 @@ cat("Columnas OMS:", paste(names(oms_raw)[1:5], collapse = ", "), "...\n")
 
 ```{r limpieza-cbioportal}
 cbio_wide <- cbio_raw %>%
-  group_by(patientId) %>%
-  summarise(
-    subtipo             = value[clinicalAttributeId == "SUBTYPE"][1],
-    edad                = value[clinicalAttributeId == "AGE"][1],
-    raza                = value[clinicalAttributeId == "RACE"][1],
-    sexo                = value[clinicalAttributeId == "SEX"][1],
-    estado_vital        = value[clinicalAttributeId == "OS_STATUS"][1],
-    supervivencia_meses = value[clinicalAttributeId == "OS_MONTHS"][1],
-    radioterapia        = value[clinicalAttributeId == "RADIATION_THERAPY"][1],
-    hipoxia_tumor       = value[clinicalAttributeId == "BUFFA_HYPOXIA_SCORE"][1]
+  as_tibble() %>%
+  transmute(
+    patientId               = str_sub(patientId, 1, 12),
+    subtipo                 = SUBTYPE,
+    edad                    = as.numeric(AGE),
+    raza                    = RACE,
+    sexo                    = SEX,
+    estado_vital            = OS_STATUS,
+    supervivencia_meses     = as.numeric(OS_MONTHS),
+    radioterapia            = RADIATION_THERAPY,
+    hipoxia_tumor           = as.numeric(BUFFA_HYPOXIA_SCORE),
+    # Añade estas dos líneas solo si aparecen en names(cbio_raw):
+    # tmb                   = as.numeric(TMB_NONSYNONYMOUS),
+    # inestabilidad_genomica = as.numeric(FRACTION_GENOME_ALTERED),
+    codigo_pais             = "USA"
   )
 
 str(cbio_wide)
