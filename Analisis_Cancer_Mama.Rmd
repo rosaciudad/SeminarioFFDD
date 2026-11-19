@@ -122,6 +122,7 @@ names(cbio_raw)
   # cbio_raw <- read_tsv("INPUT/DATA/brca_tcga_clinical.tsv", show_col_types = FALSE)
 
 ```
+
 #### Importación de datos clínicos, tratamientos y seguimientos desde NCI GDC
 
 En este bloque se accede de forma programática al portal **Genomic Data Commons (GDC)** del Instituto Nacional del Cáncer (NCI) utilizando el paquete oficial `GenomicDataCommons` de Bioconductor. A través del *endpoint* `cases()`, se construye una consulta filtrada exclusivamente para la cohorte de cáncer de mama (**`TCGA-BRCA`**) y se expanden de manera anidada los bloques de información demográfica (`demographic`), diagnósticos (`diagnoses`), pautas terapéuticas (`diagnoses.treatments`) y seguimientos clínicos (`follow_ups`). Posteriormente, la respuesta paginada obtenida de la API se transforma en un objeto tabular (`tibble`) mediante `as_tibble()` para facilitar su inspección y posterior desanidado, manteniendo además una línea comentada con `fromJSON()` como plan de respaldo local en caso de caída de red.
@@ -215,6 +216,7 @@ Para solucionar este problema se han agrupado todas las filas que comparten un m
 Cabe destacar que dentro de summarise(), fitramos la columna value buscando el nombre del atributo en clinicalAttributeId añadiendo [1] al final para garantizar que R extraiga un sólo elemento por casilla, asegurándonos, además de que si hay algún valor ausente, **R rellenará el con NA**.
 
 ## 3.2. Limpieza de la OMS
+
 Ahora, debemos realizar la limpieza de los datos de obesidad proporcionados por la Organización Mundial de la Salud. Para ello, se han filtrado los datos para utilizar únicamente los **procedentes de mujeres** ya que el cáncer de mama es una enfermedad mayoritariamente femenina y la inclusión de datos procedentes de hombres podría perjudicar el posterior análisis estadístico ya que la incidencia en ellos es casi nula. Además se van a trabajar únicamente los **datos generados este último año**.
 
 ```{r limpieza-oms}
@@ -233,6 +235,7 @@ oms_obesidad <- oms_raw %>%
 str(oms_obesidad)
 
 ```
+
 Además, se han seleccionado para el análisis exclusivamente 4 columnas que se han considerado relevamtes para este. A estos atributos se les ha cambiado el nombre para facilitar la comprensión de los datos.
 
 ## 3.3. Desanidado del JSON del GDC
@@ -266,9 +269,6 @@ gdc_limpio <- gdc_pacientes %>%
 
 #str(gdc_limpio)
 ```
-
-
-
 
 ## 3.4. Cruce de las tres fuentes
 
@@ -378,21 +378,22 @@ tabla_clinica_gdc
 
 ## 4.2. Inestabilidad genómica por subtipo
 
-```{r grafico-fga}
-# GRÁFICO 1: Inestabilidad genómica por subtipo molecular
-p1_inestabilidad <- datos_integrados %>%
-  dplyr::filter(!is.na(subtipo), !is.na(inestabilidad_genomica)) %>%
-  ggplot(aes(x = reorder(subtipo, inestabilidad_genomica, FUN = median), 
-             y = inestabilidad_genomica, fill = subtipo)) +
-  geom_boxplot(alpha = 0.8, outlier.alpha = 0.4) +
+```{r inestabilidad, fig.width=10, fig.height=6}
+p1_inestabilidad <- datos_cruzados %>%
+  dplyr::filter(!is.na(Subtipo), !is.na(inestabilidad_genomica)) %>%
+  ggplot(aes(x = reorder(Subtipo, inestabilidad_genomica, FUN = median),
+             y = inestabilidad_genomica,
+             fill = Subtipo)) +
+  geom_boxplot(alpha = 0.85, outlier.alpha = 0.4) +
   coord_flip() +
+  scale_fill_brewer(palette = "Set2") +
   labs(
     title    = "Inestabilidad Genómica según Subtipo Molecular (TCGA-BRCA)",
-    subtitle = "Fracción del genoma alterado (FGA) por subtipo intrínseco PAM50",
+    subtitle = "Distribución de la fracción del genoma alterado (FGA) por subtipo intrínseco",
     x        = "Subtipo Molecular",
     y        = "Fracción del Genoma Alterado"
   ) +
-  theme_minimal() +
+  theme_classic() +
   theme(legend.position = "none")
 
 p1_inestabilidad
@@ -400,27 +401,123 @@ p1_inestabilidad
 
 ## 4.3. Medicina de precisión en acción: tratamientos por subtipo
 
-```{r grafico-tratamientos}
-# Chunk 8: barras agrupadas hormonoterapia vs quimioterapia
+```{r grafico-2-tratamientos, fig.width=10, fig.height=6}
+p2_tratamientos <- datos_cruzados %>%
+  dplyr::filter(!is.na(Subtipo), tratamientos != "") %>%
+  separate_rows(tratamientos, sep = "; ") %>%
+  dplyr::count(Subtipo, tratamientos) %>%
+  ggplot(aes(x = Subtipo, y = n, fill = tratamientos)) +
+  geom_col(position = "fill", colour = "white", linewidth = 0.2) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_brewer(palette = "Paired") +
+  labs(
+    title    = "Distribución de Pautas Terapéuticas por Subtipo Molecular",
+    subtitle = "Integración de clasificación molecular (cBioPortal) y terapias registradas (NCI GDC)",
+    x        = "Subtipo Molecular",
+    y        = "Proporción de Tratamientos",
+    fill     = "Modalidad Terapéutica"
+  ) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1),
+        legend.position = "bottom")
+
+p2_tratamientos
 ```
 
 ## 4.4. Disparidades raciales en la distribución de subtipos
 
-```{r grafico-razas}
-# Chunk 9: barras apiladas al 100% por raza
+```{r disparidades, fig.width=10, fig.height=6}
+p3_disparidades <- datos_cruzados %>%
+  dplyr::filter(
+    !is.na(demographic.race),
+    !demographic.race %in% c("not reported", "Unknown", "Not Available"),
+    !is.na(estadio_gdc),
+    estadio_gdc != "Stage X"
+  ) %>%
+  ggplot(aes(x = str_to_title(demographic.race), fill = estadio_gdc)) +
+  geom_bar(position = "fill", colour = "white", linewidth = 0.2) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_viridis_d(option = "plasma") +
+  labs(
+    title    = "Disparidades Raciales en el Estadio Tumoral al Diagnóstico",
+    subtitle = "Distribución porcentual del estadio AJCC (NCI GDC) según grupo racial",
+    x        = "Grupo Racial",
+    y        = "Proporción de Pacientes",
+    fill     = "Estadio Clínico"
+  ) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 25, hjust = 1))
+
+p3_disparidades
 ```
 
 ## 4.5. Edad, TMB y estado vital
 
-```{r grafico-edad-tmb}
-# Chunk 10: scatter edad vs TMB con color por subtipo
+```{r edad-tmb, fig.width=10, fig.height=6}
+p4_edad_tmb <- datos_cruzados %>%
+  dplyr::filter(!is.na(edad), !is.na(tmb), !is.na(Subtipo), tmb > 0) %>%
+  ggplot(aes(x = edad, y = tmb, colour = Subtipo)) +
+  geom_point(alpha = 0.65, size = 2) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 0.9) +
+  scale_y_log10() +
+  scale_colour_brewer(palette = "Set1") +
+  labs(
+    title    = "Relación entre Edad al Diagnóstico y Carga Mutacional (TMB)",
+    subtitle = "Escala logarítmica para TMB no sinónimo estratificada por subtipo molecular",
+    x        = "Edad al diagnóstico (años)",
+    y        = "TMB (mutaciones/Mb, escala log10)",
+    colour   = "Subtipo Molecular"
+  ) +
+  theme_classic() +
+  theme(legend.position = "bottom")
+
+p4_edad_tmb
 ```
 
 ## 4.6. Contexto mundial: obesidad femenina y subtipos
 
-```{r grafico-mapa}
-# Chunk 11: mapa mundial o scatter obesidad vs proporción Basal-like
+```{r grafico-mapa, fig.width=10, fig.height=6}
+
+# ==============================================================================
+# OPCIÓN B: Mapa Mundial de Obesidad Femenina (OMS) con países de la cohorte TCGA
+# ==============================================================================
+# Carga el mapa base incluido por defecto en ggplot2 (requiere paquete 'maps', estándar en R)
+mapa_mundo <- map_data("world") %>%
+  as_tibble() %>%
+  dplyr::filter(region != "Antarctica") %>%
+  mutate(
+    # Armonizamos nombres clave para cruzar con la tabla 'oms_obesidad'
+    pais_clave = case_when(
+      region == "USA"    ~ "United States of America",
+      region == "Russia" ~ "Russian Federation",
+      region == "UK"     ~ "United Kingdom",
+      TRUE               ~ region
+    )
+  )
+
+# Unimos el mapa con los datos de la OMS
+mapa_oms <- mapa_mundo %>%
+  left_join(oms_obesidad, by = c("pais_clave" = "pais"))
+
+p5_mapa <- ggplot(mapa_oms, aes(x = long, y = lat, group = group)) +
+  geom_polygon(aes(fill = porcentaje_obesas), colour = "grey85", linewidth = 0.15) +
+  scale_fill_viridis_c(option = "magma", direction = -1, na.value = "grey92") +
+  coord_fixed(1.3) +
+  labs(
+    title    = "Contexto Epidemiológico Global: Prevalencia de Obesidad Femenina (OMS)",
+    subtitle = "Porcentaje de mujeres adultas con IMC ≥ 30 kg/m² (último año disponible)",
+    fill     = "Obesidad (%)"
+  ) +
+  theme_void() +
+  theme(
+    legend.position = "bottom",
+    plot.title      = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle   = element_text(hjust = 0.5)
+  )
+
+p5_mapa
 ```
+
 
 # 5. Discusión
 
