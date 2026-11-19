@@ -129,8 +129,10 @@ En este bloque se accede de forma programática al portal **Genomic Data Commons
 ```{r Importaciones de NCI GDC}
 
 #Instalación del paquete(una unica ejecucion)
-#install.packages("BiocManager")
-#BiocManager::install("GenomicDataCommons")
+if (!require("BiocManager", quietly = TRUE)) {
+  install.packages("BiocManager")
+}
+BiocManager::install("GenomicDataCommons")
 
 #Importacion
 library(GenomicDataCommons)
@@ -139,7 +141,7 @@ library(GenomicDataCommons)
 gdc_resultados <- cases() %>%
   filter(~ project.project_id == "TCGA-BRCA") %>%
   expand(c("demographic", "diagnoses", "diagnoses.treatments", "follow_ups")) %>%
-
+  results_all()
 # 2. Convertimos la respuesta en un tibble/data.frame manejable
 gdc_raw <- as_tibble(gdc_resultados)
 
@@ -154,6 +156,7 @@ names(gdc_raw)
 ```{r Importaciones de la OMS}
 
 oms_raw <- read_csv(file = "INPUT/DATA/obesidad_oms.csv", show_col_types = FALSE)
+
 
 ```
 
@@ -199,8 +202,8 @@ cbio_wide <- cbio_raw %>%
     radioterapia            = RADIATION_THERAPY,
     hipoxia_tumor           = as.numeric(BUFFA_HYPOXIA_SCORE),
     # Añade estas dos líneas solo si aparecen en names(cbio_raw):
-    # tmb                   = as.numeric(TMB_NONSYNONYMOUS),
-    # inestabilidad_genomica = as.numeric(FRACTION_GENOME_ALTERED),
+    tmb                   = as.numeric(TMB_NONSYNONYMOUS),
+    inestabilidad_genomica = as.numeric(FRACTION_GENOME_ALTERED),
     codigo_pais             = "USA"
   )
 
@@ -216,18 +219,19 @@ Ahora, debemos realizar la limpieza de los datos de obesidad proporcionados por 
 
 ```{r limpieza-oms}
 oms_obesidad <- oms_raw %>%
-  filter(
+  dplyr::filter(
     Dim1ValueCode == "SEX_FMLE",
     Period == max(Period, na.rm = TRUE)
   ) %>%
-  select(
-    cod_pais  = SpatialDimValueCode,
-    pais  = Location,
-    ano  = Period,
+  dplyr::select(
+    cod_pais          = SpatialDimValueCode,
+    pais              = Location,
+    ano               = Period,
     porcentaje_obesas = FactValueNumeric
   )
 
 str(oms_obesidad)
+
 ```
 Además, se han seleccionado para el análisis exclusivamente 4 columnas que se han considerado relevamtes para este. A estos atributos se les ha cambiado el nombre para facilitar la comprensión de los datos.
 
@@ -236,54 +240,76 @@ Además, se han seleccionado para el análisis exclusivamente 4 columnas que se 
 El último paso antes de realizar el cruce de los datos es **aplanar y consolidar el último de los JSON**. Para ello, nos quedaremos con las columnas case_submitter_id, category, classification y notes a las que hemos cambiado los nombres para facilitar la comprensión del conjunto de datos. Después, hemos agrupado dicho dataset a partir de la columna case_submitter_id y hemos garantizado la **generación de una fila por paciente**.
 
 ```{r desanidado-gdc}
-gdc_anotaciones <- gdc_raw %>%
-  select(
-    case_submitter_id,
-    categoria_gdc     = category,
-    clasificacion_gdc = classification,
-    notas_gdc         = notes
-  ) %>%
-  group_by(case_submitter_id) %>%
+# 1. Extraemos ID del paciente y datos demográficos
+gdc_pacientes <- gdc_raw %>%
+  mutate(patientId = str_sub(submitter_id, 1, 12)) %>%
+  dplyr::select(patientId, any_of(c("primary_site", "disease_type", "demographic"))) %>%
+  unnest_wider(any_of("demographic"), names_sep = ".")
+
+# 2. Desanidamos diagnósticos y tratamientos usando patientId como clave exterior
+gdc_tratamientos <- gdc_raw %>%
+  mutate(patientId = str_sub(submitter_id, 1, 12)) %>%
+  dplyr::select(patientId, any_of("diagnoses")) %>%
+  unnest(diagnoses, keep_empty = TRUE, names_sep = "_") %>%
+  dplyr::select(patientId, any_of(c("diagnoses_tumor_stage", "diagnoses_ajcc_pathologic_stage", "diagnoses_age_at_diagnosis", "diagnoses_treatments"))) %>%
+  unnest(diagnoses_treatments, keep_empty = TRUE, names_sep = "_") %>%
+  group_by(patientId) %>%
   summarise(
-    num_anotaciones   = length(categoria_gdc),
-    categoria_gdc     = categoria_gdc[1],
-    clasificacion_gdc = clasificacion_gdc[1],
-    notas_gdc         = notas_gdc[1]
+    estadio_gdc  = first(na.omit(coalesce(!!!syms(intersect(names(.), c("diagnoses_ajcc_pathologic_stage", "diagnoses_tumor_stage")))))),
+    tratamientos = paste(unique(na.omit(diagnoses_treatments_treatment_type)), collapse = "; "),
+    .groups      = "drop"
   )
 
-str(gdc_anotaciones)
+# 3. Unimos ambas tablas limpias del GDC
+gdc_limpio <- gdc_pacientes %>%
+  left_join(gdc_tratamientos, by = "patientId")
 
+#str(gdc_limpio)
 ```
+
+
+
 
 ## 3.4. Cruce de las tres fuentes
 
 Por último, vamos a cruzar los datos con el objetivo de poder generar visualizaciones y tablas que nos permitan efectuar un análisis crítico de los datasets encontrados. En este apartado se van a cruzar únicamenre los datos de cBioPortal y GDC. Possteriormente, se cruzaran con estos los datos de la OMS sobre obesidad que hemos limpiado con el fin de generar gráficos que permitan responder a las preguntas del seminario.
 
 ```{r cruce-fuentes}
-datos_cruzados <- cbio_wide %>%
-  left_join(gdc_anotaciones, by = c("patientId" = "case_submitter_id")) %>%
-  filter(!is.na(subtipo)) %>%
+# 1. Mapeamos el país de residencia del GDC a código ISO-3 para cruzar con la OMS
+gdc_para_cruce <- gdc_limpio %>%
   mutate(
-    Subtipo = ifelse(
-      subtipo == "BRCA_LumA", "Luminal A",
-      ifelse(
-        subtipo == "BRCA_LumB", "Luminal B",
-        ifelse(
-          subtipo == "BRCA_Basal", "Basal-like",
-          ifelse(
-            subtipo == "BRCA_Her2", "HER2-enriquecido",
-            "Normal-like"
-          )
-        )
-      )
+    cod_pais = case_when(
+      demographic.country_of_residence_at_enrollment == "United States" ~ "USA",
+      demographic.country_of_residence_at_enrollment == "Germany"       ~ "DEU",
+      demographic.country_of_residence_at_enrollment == "Russia"        ~ "RUS",
+      demographic.country_of_residence_at_enrollment == "Vietnam"       ~ "VNM",
+      demographic.country_of_residence_at_enrollment == "Poland"        ~ "POL",
+      demographic.country_of_residence_at_enrollment == "Ukraine"       ~ "UKR",
+      demographic.country_of_residence_at_enrollment == "Brazil"        ~ "BRA",
+      demographic.country_of_residence_at_enrollment == "Canada"        ~ "CAN",
+      TRUE                                                            ~ "USA"
+    )
+  )
+
+# 2. Cruce de las 3 fuentes: inner_join (cBioPortal + GDC) y left_join (OMS)
+datos_cruzados <- cbio_wide %>%
+  inner_join(gdc_para_cruce, by = "patientId") %>%
+  left_join(oms_obesidad, by = "cod_pais") %>%
+  dplyr::filter(!is.na(subtipo)) %>%
+  mutate(
+    Subtipo = case_when(
+      subtipo == "BRCA_LumA"  ~ "Luminal A",
+      subtipo == "BRCA_LumB"  ~ "Luminal B",
+      subtipo == "BRCA_Basal" ~ "Basal-like",
+      subtipo == "BRCA_Her2"  ~ "HER2-enriquecido",
+      TRUE                    ~ "Normal-like"
     ),
-    tiene_anotacion_gdc = ifelse(is.na(num_anotaciones), "Sin anotación", "Con anotación")
+    tiene_tratamiento_gdc = ifelse(tratamientos == "", "Sin registro", "Con registro")
   )
 
 str(datos_cruzados)
-# NOTA: El cruce con la OMS se hará en la fase de resultados si es necesario,
-# ya que el GDC no trae el país directamente en este nivel, sino en 'demographic'.
 ```
+
 En este código, se ha utilizado un left join para unir las dos relaciones anteriores a través del id del paciente. Es imporatante mencionar que se ha filtrado por subtipo y se ha cambiado el nombre de cada uno de los mismos para simplificar la relación resultante. Se ha añadido un atributo `tiene_anotacion_gdc` que recoge si existe algún factor extra que deba considerarse como antecedentes de cáncer u otros.
 
 # 4. Resultados
@@ -353,7 +379,23 @@ tabla_clinica_gdc
 ## 4.2. Inestabilidad genómica por subtipo
 
 ```{r grafico-fga}
-# Chunk 7: boxplot FGA por subtipo
+# GRÁFICO 1: Inestabilidad genómica por subtipo molecular
+p1_inestabilidad <- datos_integrados %>%
+  dplyr::filter(!is.na(subtipo), !is.na(inestabilidad_genomica)) %>%
+  ggplot(aes(x = reorder(subtipo, inestabilidad_genomica, FUN = median), 
+             y = inestabilidad_genomica, fill = subtipo)) +
+  geom_boxplot(alpha = 0.8, outlier.alpha = 0.4) +
+  coord_flip() +
+  labs(
+    title    = "Inestabilidad Genómica según Subtipo Molecular (TCGA-BRCA)",
+    subtitle = "Fracción del genoma alterado (FGA) por subtipo intrínseco PAM50",
+    x        = "Subtipo Molecular",
+    y        = "Fracción del Genoma Alterado"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+p1_inestabilidad
 ```
 
 ## 4.3. Medicina de precisión en acción: tratamientos por subtipo
