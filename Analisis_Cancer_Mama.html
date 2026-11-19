@@ -2907,10 +2907,27 @@ cruce → análisis descriptivo → gráficos → exportación.)</em></p>
 </div>
 <div id="procesamiento-y-limpieza" class="section level1">
 <h1>3. Procesamiento y limpieza</h1>
-<p><em>(En esta sección transformamos los datos crudos importados en
-tablas limpias y listas para el cruce).</em></p>
+<p>En esta sección se van a transformar los datos de tal manera que
+estos puedan ser utilizados para la <strong>generación de tablas y
+gráficas que nos ayudarán a responder las preguntas planteadas</strong>
+en la introducción del seminario. Se va a realizar la limpieza del
+fichero procedente de cBioPortal, así como de los datos proporcionados
+por la OMS. Además, se llevará a cabo el desanidado del JSON procedente
+del GDC para poder cruzar los conjuntos de datos mencionados.</p>
 <div id="limpieza-de-cbioportal" class="section level2">
 <h2>3.1. Limpieza de cBioPortal</h2>
+<p>La API de cBioPortal devuelve los datos en el llamado <strong>formato
+largo</strong>, es decir, cada fila no se corresponde con un paciente
+sino con un único atributo que recibe el nombre de clinicalAttributeId
+acompañado de un valor (value). Esto provoca que <strong>una misma
+paciente aparezca repetida en un gran número de filas seguidas</strong>,
+imposibilitando el cruce de datos con otras fuentes o la generación de
+comparaciones gráficas de variables.</p>
+<p>Para explicarlo de forma más sencilla, en este formato largo, los
+distintos atributos de un paciente como la edad, la raza, el sexo o el
+estado vital aparecen en diferentes filas cuando lo que necesitamos es
+una relación en la que <strong>el paciente sea una tupla y sus atributos
+sean las variables</strong> antes mencionadas.</p>
 <pre class="r"><code>cbio_wide &lt;- cbio_raw %&gt;%
   group_by(patientId) %&gt;%
   summarise(
@@ -2935,24 +2952,27 @@ str(cbio_wide)</code></pre>
 ##  $ supervivencia_meses: chr [1:1084] &quot;133.0505967&quot; &quot;131.6697899&quot; &quot;48.45974291&quot; &quot;47.60495775&quot; ...
 ##  $ radioterapia       : chr [1:1084] &quot;No&quot; &quot;Yes&quot; &quot;No&quot; &quot;No&quot; ...
 ##  $ hipoxia_tumor      : chr [1:1084] &quot;-21&quot; &quot;5&quot; &quot;-5&quot; &quot;-27&quot; ...</code></pre>
+<p>Para solucionar este problema se han agrupado todas las filas que
+comparten un mismo identificador de paciente para después crear 8
+atributos correspondientes a los datos recogidos para cada paciente en
+el fichero. Además, se ha traducido el nombre de estos para facilitar la
+lectura y comprensión del conjunto.</p>
+<p>Cabe destacar que dentro de summarise(), fitramos la columna value
+buscando el nombre del atributo en clinicalAttributeId añadiendo [1] al
+final para garantizar que R extraiga un sólo elemento por casilla,
+asegurándonos, además de que si hay algún valor ausente, <strong>R
+rellenará el con NA</strong>.</p>
 </div>
 <div id="limpieza-de-la-oms" class="section level2">
 <h2>3.2. Limpieza de la OMS</h2>
-<p>A la hora de procesar los datos de prevalencia de obesidad obtenidos
-del Global Health Observatory de la OMS, se ha aplicado un filtro para
-conservar exclusivamente los registros correspondientes al sexo femenino
-<strong>(Dim1ValueCode == “SEX_FMLE”).</strong> Esta decisión es
-puramente metodológica y está directamente alineada con la naturaleza de
-nuestro estudio, <strong>centrado en el cáncer de mama</strong>. Dado
-que esta <strong>patología afecta de manera casi exclusiva a las
-mujeres</strong>, resulta biológicamente incoherente y estadísticamente
-sesgado cruzar la información clínica y genómica de nuestras pacientes
-(procedentes de TCGA-BRCA y del GDC) con tasas de obesidad poblacional
-que incluyan a los hombres o que mezclen ambos sexos. Al restringir la
-variable de la OMS al género femenino, garantizamos que la variable
-contextual (el factor de riesgo de la obesidad) sea demográficamente
-comparable con nuestra cohorte de estudio, permitiendo un análisis
-ecológico mucho más riguroso y significativo.</p>
+<p>Ahora, debemos realizar la limpieza de los datos de obesidad
+proporcionados por la Organización Mundial de la Salud. Para ello, se
+han filtrado los datos para utilizar únicamente los <strong>procedentes
+de mujeres</strong> ya que el cáncer de mama es una enfermedad
+mayoritariamente femenina y la inclusión de datos procedentes de hombres
+podría perjudicar el posterior análisis estadístico ya que la incidencia
+en ellos es casi nula. Además se van a trabajar únicamente los
+<strong>datos generados este último año</strong>.</p>
 <pre class="r"><code>oms_obesidad &lt;- oms_raw %&gt;%
   filter(
     Dim1ValueCode == &quot;SEX_FMLE&quot;,
@@ -2971,9 +2991,20 @@ str(oms_obesidad)</code></pre>
 ##  $ pais             : chr [1:199] &quot;Nepal&quot; &quot;Myanmar&quot; &quot;India&quot; &quot;Burkina Faso&quot; ...
 ##  $ ano              : num [1:199] 2024 2024 2024 2024 2024 ...
 ##  $ porcentaje_obesas: num [1:199] 10.3 10.4 10.4 10.7 11.6 ...</code></pre>
+<p>Además, se han seleccionado para el análisis exclusivamente 4
+columnas que se han considerado relevamtes para este. A estos atributos
+se les ha cambiado el nombre para facilitar la comprensión de los
+datos.</p>
 </div>
 <div id="desanidado-del-json-del-gdc" class="section level2">
 <h2>3.3. Desanidado del JSON del GDC</h2>
+<p>El último paso antes de realizar el cruce de los datos es
+<strong>aplanar y consolidar el último de los JSON</strong>. Para ello,
+nos quedaremos con las columnas case_submitter_id, category,
+classification y notes a las que hemos cambiado los nombres para
+facilitar la comprensión del conjunto de datos. Después, hemos agrupado
+dicho dataset a partir de la columna case_submitter_id y hemos
+garantizado la <strong>generación de una fila por paciente</strong>.</p>
 <pre class="r"><code>gdc_anotaciones &lt;- gdc_raw %&gt;%
   select(
     case_submitter_id,
@@ -2999,9 +3030,7 @@ str(gdc_anotaciones)</code></pre>
 </div>
 <div id="cruce-de-las-tres-fuentes" class="section level2">
 <h2>3.4. Cruce de las tres fuentes</h2>
-<p><em>(Unimos cBioPortal con GDC por
-<code>Patient ID == submitter_id</code>, y luego añadimos la obesidad
-cruzando por país).</em></p>
+<p>Por último vamos a cruzar los resultados</p>
 <pre class="r"><code>datos_cruzados &lt;- cbio_wide %&gt;%
   left_join(gdc_anotaciones, by = c(&quot;patientId&quot; = &quot;case_submitter_id&quot;)) %&gt;%
   filter(!is.na(subtipo)) %&gt;%

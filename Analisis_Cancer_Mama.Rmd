@@ -177,9 +177,13 @@ cat("Columnas OMS:", paste(names(oms_raw)[1:5], collapse = ", "), "...\n")
 
 # 3. Procesamiento y limpieza
 
-*(En esta sección transformamos los datos crudos importados en tablas limpias y listas para el cruce).*
+En esta sección se van a transformar los datos de tal manera que estos puedan ser utilizados para la **generación de tablas y gráficas que nos ayudarán a responder las preguntas planteadas** en la introducción del seminario. Se va a realizar la limpieza del fichero procedente de cBioPortal, así como de los datos proporcionados por la OMS. Además, se llevará a cabo el desanidado del JSON procedente del GDC para poder cruzar los conjuntos de datos mencionados.
 
 ## 3.1. Limpieza de cBioPortal
+
+La API de cBioPortal devuelve los datos en el llamado **formato largo**, es decir, cada fila no se corresponde con un paciente sino con un único atributo que recibe el nombre de clinicalAttributeId acompañado de un valor (value). Esto provoca que **una misma paciente aparezca repetida en un gran número de filas seguidas**, imposibilitando el cruce de datos con otras fuentes o la generación de comparaciones gráficas de variables.
+
+Para explicarlo de forma más sencilla, en este formato largo, los distintos atributos de un paciente como la edad, la raza, el sexo o el estado vital aparecen en diferentes filas cuando lo que necesitamos es una relación en la que **el paciente sea una tupla y sus atributos sean las variables** antes mencionadas.
 
 ```{r limpieza-cbioportal}
 cbio_wide <- cbio_raw %>%
@@ -203,9 +207,12 @@ cbio_wide <- cbio_raw %>%
 str(cbio_wide)
 ```
 
-## 3.2. Limpieza de la OMS
+Para solucionar este problema se han agrupado todas las filas que comparten un mismo identificador de paciente para después crear 8 atributos correspondientes a los datos recogidos para cada paciente en el fichero. Además, se ha traducido el nombre de estos para facilitar la lectura y comprensión del conjunto.
 
-A la hora de procesar los datos de prevalencia de obesidad obtenidos del Global Health Observatory de la OMS, se ha aplicado un filtro para conservar exclusivamente los registros correspondientes al sexo femenino **(Dim1ValueCode == "SEX_FMLE").** Esta decisión es puramente metodológica y está directamente alineada con la naturaleza de nuestro estudio, **centrado en el cáncer de mama**. Dado que esta **patología afecta de manera casi exclusiva a las mujeres**, resulta biológicamente incoherente y estadísticamente sesgado cruzar la información clínica y genómica de nuestras pacientes (procedentes de TCGA-BRCA y del GDC) con tasas de obesidad poblacional que incluyan a los hombres o que mezclen ambos sexos. Al restringir la variable de la OMS al género femenino, garantizamos que la variable contextual (el factor de riesgo de la obesidad) sea demográficamente comparable con nuestra cohorte de estudio, permitiendo un análisis ecológico mucho más riguroso y significativo.
+Cabe destacar que dentro de summarise(), fitramos la columna value buscando el nombre del atributo en clinicalAttributeId añadiendo [1] al final para garantizar que R extraiga un sólo elemento por casilla, asegurándonos, además de que si hay algún valor ausente, **R rellenará el con NA**.
+
+## 3.2. Limpieza de la OMS
+Ahora, debemos realizar la limpieza de los datos de obesidad proporcionados por la Organización Mundial de la Salud. Para ello, se han filtrado los datos para utilizar únicamente los **procedentes de mujeres** ya que el cáncer de mama es una enfermedad mayoritariamente femenina y la inclusión de datos procedentes de hombres podría perjudicar el posterior análisis estadístico ya que la incidencia en ellos es casi nula. Además se van a trabajar únicamente los **datos generados este último año**.
 
 ```{r limpieza-oms}
 oms_obesidad <- oms_raw %>%
@@ -222,8 +229,11 @@ oms_obesidad <- oms_raw %>%
 
 str(oms_obesidad)
 ```
+Además, se han seleccionado para el análisis exclusivamente 4 columnas que se han considerado relevamtes para este. A estos atributos se les ha cambiado el nombre para facilitar la comprensión de los datos.
 
 ## 3.3. Desanidado del JSON del GDC
+
+El último paso antes de realizar el cruce de los datos es **aplanar y consolidar el último de los JSON**. Para ello, nos quedaremos con las columnas case_submitter_id, category, classification y notes a las que hemos cambiado los nombres para facilitar la comprensión del conjunto de datos. Después, hemos agrupado dicho dataset a partir de la columna case_submitter_id y hemos garantizado la **generación de una fila por paciente**.
 
 ```{r desanidado-gdc}
 gdc_anotaciones <- gdc_raw %>%
@@ -243,13 +253,11 @@ gdc_anotaciones <- gdc_raw %>%
 
 str(gdc_anotaciones)
 
-
-
 ```
 
 ## 3.4. Cruce de las tres fuentes
 
-*(Unimos cBioPortal con GDC por `Patient ID == submitter_id`, y luego añadimos la obesidad cruzando por país).*
+Por último, vamos a cruzar los datos con el objetivo de poder generar visualizaciones y tablas que nos permitan efectuar un análisis crítico de los datasets encontrados. En este apartado se van a cruzar únicamenre los datos de cBioPortal y GDC. Possteriormente, se cruzaran con estos los datos de la OMS sobre obesidad que hemos limpiado con el fin de generar gráficos que permitan responder a las preguntas del seminario.
 
 ```{r cruce-fuentes}
 datos_cruzados <- cbio_wide %>%
@@ -276,14 +284,13 @@ str(datos_cruzados)
 # NOTA: El cruce con la OMS se hará en la fase de resultados si es necesario,
 # ya que el GDC no trae el país directamente en este nivel, sino en 'demographic'.
 ```
+En este código, se ha utilizado un left join para unir las dos relaciones anteriores a través del id del paciente. Es imporatante mencionar que se ha filtrado por subtipo y se ha cambiado el nombre de cada uno de los mismos para simplificar la relación resultante. Se ha añadido un atributo `tiene_anotacion_gdc` que recoge si existe algún factor extra que deba considerarse como antecedentes de cáncer u otros.
 
 # 4. Resultados
 
-A continuación se van a mostrar una serie de gráficos y tablas que responden a las preguntas antes mencionadas.
-
 ## 4.1. Análisis descriptivo
 
-Se van a realizar una serie de tablas que resumen la información con el objetivo de **preparar los datos para la generación de visualizaciones**.
+Se van a realizar una serie de tablas que resumen la información facilitando el análisis crítico de la información proporcionada por los datos. Además, estas tablas nos van a servir de base para construir muchas de las visualizaciones que nos ayudarán a responder a las preguntas.
 
 ### Tabla 1: Tabla por subtipo molecular PAM50.
 
