@@ -127,18 +127,22 @@ cat("Columnas OMS:", paste(names(oms_raw)[1:5], collapse = ", "), "...\n")
 
 ## 3.1. Limpieza de cBioPortal
 
-La API de cBioPortal devuelve la información clínica en un **formato "largo" (long format),** donde cada fila representa un único atributo de un paciente (por ejemplo, una fila para la edad y otra para el subtipo tumoral). Para poder cruzar estos datos de manera eficiente con las otras fuentes, **es necesario reorganizar la estructura a un formato "ancho" (wide format)**, de modo que obtengamos una única **fila por paciente y una columna para cada variable clínica**. Para ello, se emplea la función pivot_wider() del paquete tidyr.
 
 ```{r limpieza-cbioportal}
 cbio_wide <- cbio_raw %>%
-  select(patientId, clinicalAttributeId, value) %>%
-  pivot_wider(
-    names_from  = clinicalAttributeId,
-    values_from = value,
-    values_fn   = first
+  group_by(patientId) %>%
+  summarise(
+    subtipo             = value[clinicalAttributeId == "SUBTYPE"][1],
+    edad                = value[clinicalAttributeId == "AGE"][1],
+    raza                = value[clinicalAttributeId == "RACE"][1],
+    sexo                = value[clinicalAttributeId == "SEX"][1],
+    estado_vital        = value[clinicalAttributeId == "OS_STATUS"][1],
+    supervivencia_meses = value[clinicalAttributeId == "OS_MONTHS"][1],
+    radioterapia        = value[clinicalAttributeId == "RADIATION_THERAPY"][1],
+    hipoxia_tumor       = value[clinicalAttributeId == "BUFFA_HYPOXIA_SCORE"][1]
   )
 
-glimpse(cbio_wide)
+str(cbio_wide)
 ```
 
 ## 3.2. Limpieza de la OMS
@@ -148,57 +152,41 @@ A la hora de procesar los datos de prevalencia de obesidad obtenidos del Global 
 ```{r limpieza-oms}
 oms_obesidad <- oms_raw %>%
   filter(
-    Dim1ValueCode == "SEX_FMLE",  
-    IsLatestYear == TRUE  # Solo el año más reciente (2024)
+    Dim1ValueCode == "SEX_FMLE",
+    Period == max(Period, na.rm = TRUE)
   ) %>%
   select(
-    iso3  = SpatialDimValueCode,  #Código ISO-3 del país
-    pais  = Location,             
-    year  = Period, 
-    valor = FactValueNumeric #Porcentaje de obesidad
+    cod_pais  = SpatialDimValueCode,
+    pais  = Location,
+    ano  = Period,
+    porcentaje_obesas = FactValueNumeric
   )
 
-glimpse(oms_obesidad)
+str(oms_obesidad)
 ```
 
 ## 3.3. Desanidado del JSON del GDC
 
-*(El GDC trae listas anidadas (`diagnoses`, `follow_ups`). Usamos `unnest()` para extraer tratamientos y biomarcadores IHC).*
-
 ```{r desanidado-gdc}
-# A) Tratamientos: diagnoses -> treatments
-gdc_tratamientos <- gdc_raw %>%
-  select(submitter_id, diagnoses) %>%
-  unnest(diagnoses, keep_empty = TRUE) %>%
-  unnest(treatments, keep_empty = TRUE) %>%
-  group_by(submitter_id) %>%
-  summarise(
-    tipo_terapia           = paste(unique(na.omit(treatment_type)), collapse = " | "),
-    farmacos               = paste(unique(na.omit(therapeutic_agents)), collapse = ", "),
-    recibio_hormonoterapia = if_else(any(treatment_type == "Hormone Therapy", na.rm = TRUE), "Sí", "No"),
-    recibio_quimioterapia  = if_else(any(treatment_type == "Chemotherapy", na.rm = TRUE), "Sí", "No"),
-    .groups = "drop"
-  )
-
-# B) Biomarcadores IHC: follow_ups -> molecular_tests
-gdc_biomarcadores <- gdc_raw %>%
-  select(submitter_id, follow_ups) %>%
-  unnest(follow_ups, keep_empty = TRUE) %>%
-  unnest(molecular_tests, keep_empty = TRUE) %>%
-  filter(
-    gene_symbol %in% c("ESR1", "PGR", "ERBB2"),
-    molecular_analysis_method == "IHC"
+gdc_anotaciones <- gdc_raw %>%
+  select(
+    case_submitter_id,
+    categoria_gdc     = category,
+    clasificacion_gdc = classification,
+    notas_gdc         = notes
   ) %>%
-  group_by(submitter_id, gene_symbol) %>%
-  summarise(resultado_ihc = first(na.omit(test_result)), .groups = "drop") %>%
-  pivot_wider(
-    names_from  = gene_symbol,
-    values_from = resultado_ihc,
-    names_prefix = "IHC_"
+  group_by(case_submitter_id) %>%
+  summarise(
+    num_anotaciones   = length(categoria_gdc),
+    categoria_gdc     = categoria_gdc[1],
+    clasificacion_gdc = clasificacion_gdc[1],
+    notas_gdc         = notas_gdc[1]
   )
 
-glimpse(gdc_tratamientos)
-glimpse(gdc_biomarcadores)
+str(gdc_anotaciones)
+
+
+
 ```
 
 ## 3.4. Cruce de las tres fuentes
@@ -207,33 +195,92 @@ glimpse(gdc_biomarcadores)
 
 ```{r cruce-fuentes}
 datos_cruzados <- cbio_wide %>%
-  inner_join(gdc_tratamientos, by = c("Patient ID" = "submitter_id")) %>%
-  left_join(gdc_biomarcadores, by = c("Patient ID" = "submitter_id")) %>%
-  filter(!is.na(Subtype)) %>%
+  left_join(gdc_anotaciones, by = c("patientId" = "case_submitter_id")) %>%
+  filter(!is.na(subtipo)) %>%
   mutate(
-    Subtipo = recode(
-      Subtype,
-      "BRCA_LumA"   = "Luminal A",
-      "BRCA_LumB"   = "Luminal B",
-      "BRCA_Basal"  = "Basal-like",
-      "BRCA_Her2"   = "HER2-enriquecido",
-      "BRCA_Normal" = "Normal-like"
-    )
+    Subtipo = ifelse(
+      subtipo == "BRCA_LumA", "Luminal A",
+      ifelse(
+        subtipo == "BRCA_LumB", "Luminal B",
+        ifelse(
+          subtipo == "BRCA_Basal", "Basal-like",
+          ifelse(
+            subtipo == "BRCA_Her2", "HER2-enriquecido",
+            "Normal-like"
+          )
+        )
+      )
+    ),
+    tiene_anotacion_gdc = ifelse(is.na(num_anotaciones), "Sin anotación", "Con anotación")
   )
 
+str(datos_cruzados)
 # NOTA: El cruce con la OMS se hará en la fase de resultados si es necesario,
 # ya que el GDC no trae el país directamente en este nivel, sino en 'demographic'.
 ```
 
 # 4. Resultados
 
-*(Aquí irían los gráficos y tablas. Los dejo como estaban en tu estructura para que los completes).*
+A continuación se van a mostrar una serie de gráficos y tablas que responden a las preguntas antes mencionadas. 
 
 ## 4.1. Análisis descriptivo
 
+Se van a realizar una serie de tablas que resumen la información con el objetivo de **preparar los datos para la generación de visualizaciones**.
+
+### Tabla 1:  Tabla por subtipo molecular PAM50.
 ```{r descriptivos}
-# Chunk 6: tablas resumen con group_by + summarise
+tabla_subtipos <- datos_cruzados %>%
+  mutate(
+    edad                = as.numeric(edad),
+    supervivencia_meses = as.numeric(supervivencia_meses),
+    hipoxia_tumor       = as.numeric(hipoxia_tumor)
+  ) %>%
+  group_by(Subtipo) %>%
+  summarise(
+    Num_pacientes   = length(patientId),
+    Porcentaje    = round(length(patientId) / length(datos_cruzados$patientId) * 100, 2),
+    Edad_media    = round(mean(edad, na.rm = TRUE), 2),
+    Edad_dt       = round(sd(edad, na.rm = TRUE), 2),
+    Superv_meses  = round(mean(supervivencia_meses, na.rm = TRUE), 2),
+    Hipoxia_media = round(mean(hipoxia_tumor, na.rm = TRUE), 2)
+  ) %>%
+  arrange(desc(Num_pacientes))
+
+tabla_subtipos
+
 ```
+### Tabla 2:  Distribución de subtipos por raza
+```{r descriptivos}
+tabla_razas <- datos_cruzados %>%
+  filter(
+    raza == "White" | 
+    raza == "Black or African American" | 
+    raza == "Asian" | 
+    raza == "American Indian or Alaska Native"
+  ) %>%
+  group_by(raza, Subtipo) %>%
+  summarise(
+    Num_pacientes = length(patientId)
+  ) %>%
+  arrange(raza, desc(Num_pacientes))
+
+tabla_razas
+```
+### Tabla 3:  Distribución de subtipos por raza
+
+```{r descriptivos}
+tabla_clinica_gdc <- datos_cruzados %>%
+  group_by(Subtipo) %>%
+  summarise(
+    Num_pacientes      = length(patientId),
+    Con_radioterapia = sum(radioterapia == "Yes", na.rm = TRUE),
+    Con_anotacion    = sum(tiene_anotacion_gdc == "Con anotación", na.rm = TRUE)
+  ) %>%
+  arrange(desc(Num_pacientes))
+
+tabla_clinica_gdc
+```
+
 
 ## 4.2. Inestabilidad genómica por subtipo
 
