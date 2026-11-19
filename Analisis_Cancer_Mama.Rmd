@@ -58,9 +58,6 @@ h2, h3, h4 {
 ", img_uri))
 ```
 
-
-
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE)
 
