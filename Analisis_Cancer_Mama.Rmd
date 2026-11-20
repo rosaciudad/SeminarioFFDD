@@ -88,12 +88,6 @@ library(tidyjson)
 
 ## 2.1. Fuentes de datos
 
-Aquí tienes el párrafo redactado de forma académica y justificada, listo para pegarlo en el apartado de **Metodología** de tu Rmd.
-
-------------------------------------------------------------------------
-
-**Justificación del uso de importación local para las fuentes de la OMS y el NCI-GDC**
-
 Para la obtención de los datos clínicos del NCI Genomic Data Commons (GDC) y los datos epidemiológicos de prevalencia de obesidad de la Organización Mundial de la Salud (OMS), se ha optado por la descarga e importación local de sus respectivos archivos (`.json` y `.csv`), en lugar de realizar una conexión directa a sus APIs. Esta decisión metodológica responde a tres motivos principales. En primer lugar, ambas plataformas oficiales presentan una alta inestabilidad en sus servicios web, lo que provocaba fallos recurrentes de timeout o bloqueos durante las peticiones. En segundo lugar, extraer los datos de estas APIs de forma programática habría requerido el uso de librerías de red externas (como `httr2`), las cuales no forman parte del temario ni de las herramientas trabajadas en la asignatura. Por último, y en relación con lo anterior, el paquete `tidyjson` enseñado en clase está diseñado exclusivamente para procesar y aplanar estructuras JSON ya cargadas en el entorno de R, careciendo de funcionalidades para hacer peticiones HTTP. Por tanto, para garantizar la reproducibilidad del análisis y ceñirnos estrictamente a los paquetes y metodologías del curso (`readr` y `jsonlite`), se ha priorizado la robustez de trabajar con una copia local de los ficheros oficiales descargados previamente desde el portal web del GDC y de la OMS.
 
 ### 2.1.1. Importación de las fuentes
@@ -193,19 +187,18 @@ Para explicarlo de forma más sencilla, en este formato largo, los distintos atr
 cbio_wide <- cbio_raw %>%
   as_tibble() %>%
   transmute(
-    patientId               = str_sub(patientId, 1, 12),
-    subtipo                 = SUBTYPE,
-    edad                    = as.numeric(AGE),
-    raza                    = RACE,
-    sexo                    = SEX,
-    estado_vital            = OS_STATUS,
-    supervivencia_meses     = as.numeric(OS_MONTHS),
-    radioterapia            = RADIATION_THERAPY,
-    hipoxia_tumor           = as.numeric(BUFFA_HYPOXIA_SCORE),
-    # Añade estas dos líneas solo si aparecen en names(cbio_raw):
-    tmb                   = as.numeric(TMB_NONSYNONYMOUS),
-    inestabilidad_genomica = as.numeric(FRACTION_GENOME_ALTERED),
-    codigo_pais             = "USA"
+    patientId = str_sub(patientId, 1, 12),
+    subtipo = SUBTYPE,
+    edad = as.numeric(AGE),
+    raza = RACE,
+    sexo = SEX,
+    estado_vital= OS_STATUS,
+    supervivencia_meses = as.numeric(OS_MONTHS),
+    radioterapia  = RADIATION_THERAPY,
+    hipoxia_tumor= as.numeric(BUFFA_HYPOXIA_SCORE),
+    tmb = as.numeric(TMB_NONSYNONYMOUS),
+    inestabilidad_genomica =as.numeric(FRACTION_GENOME_ALTERED),
+    codigo_pais = "USA"
   )
 
 str(cbio_wide)
@@ -243,31 +236,33 @@ Además, se han seleccionado para el análisis exclusivamente 4 columnas que se 
 El último paso antes de realizar el cruce de los datos es **aplanar y consolidar el último de los JSON**. Para ello, nos quedaremos con las columnas case_submitter_id, category, classification y notes a las que hemos cambiado los nombres para facilitar la comprensión del conjunto de datos. Después, hemos agrupado dicho dataset a partir de la columna case_submitter_id y hemos garantizado la **generación de una fila por paciente**.
 
 ```{r desanidado-gdc}
-# 1. Extraemos ID del paciente y datos demográficos
+library(tidyverse)
+
+# 1. Tabla exterior: ID del paciente y datos demográficos
 gdc_pacientes <- gdc_raw %>%
   mutate(patientId = str_sub(submitter_id, 1, 12)) %>%
-  dplyr::select(patientId, any_of(c("primary_site", "disease_type", "demographic"))) %>%
-  unnest_wider(any_of("demographic"), names_sep = ".")
+  dplyr::select(patientId, primary_site, disease_type, demographic) %>%
+  unnest_wider(demographic, names_sep = ".")
 
-# 2. Desanidamos diagnósticos y tratamientos usando patientId como clave exterior
+# 2. Tabla interior: diagnósticos y tratamientos
 gdc_tratamientos <- gdc_raw %>%
   mutate(patientId = str_sub(submitter_id, 1, 12)) %>%
-  dplyr::select(patientId, any_of("diagnoses")) %>%
+  dplyr::select(patientId, diagnoses) %>%
   unnest(diagnoses, keep_empty = TRUE, names_sep = "_") %>%
-  dplyr::select(patientId, any_of(c("diagnoses_tumor_stage", "diagnoses_ajcc_pathologic_stage", "diagnoses_age_at_diagnosis", "diagnoses_treatments"))) %>%
+  dplyr::select(patientId, any_of(c("diagnoses_ajcc_pathologic_stage", "diagnoses_tumor_stage", "diagnoses_treatments"))) %>%
   unnest(diagnoses_treatments, keep_empty = TRUE, names_sep = "_") %>%
   group_by(patientId) %>%
   summarise(
-    estadio_gdc  = first(na.omit(coalesce(!!!syms(intersect(names(.), c("diagnoses_ajcc_pathologic_stage", "diagnoses_tumor_stage")))))),
+    estadio_gdc  = first(na.omit(diagnoses_ajcc_pathologic_stage)),
     tratamientos = paste(unique(na.omit(diagnoses_treatments_treatment_type)), collapse = "; "),
-    .groups      = "drop"
+    .groups = "drop"
   )
 
-# 3. Unimos ambas tablas limpias del GDC
+# 3. Unión 1 a 1 con left_join()
 gdc_limpio <- gdc_pacientes %>%
   left_join(gdc_tratamientos, by = "patientId")
 
-#str(gdc_limpio)
+str(gdc_limpio) 
 ```
 
 ## 3.4. Cruce de las tres fuentes
@@ -346,7 +341,7 @@ tabla_subtipos
 
 ```{r descriptivos-raza}
 tabla_razas <- datos_cruzados %>%
-  filter(
+  dplyr::filter(
     raza == "White" | 
     raza == "Black or African American" | 
     raza == "Asian" | 
@@ -369,7 +364,7 @@ tabla_clinica_gdc <- datos_cruzados %>%
   summarise(
     Num_pacientes      = length(patientId),
     Con_radioterapia = sum(radioterapia == "Yes", na.rm = TRUE),
-    Con_anotacion    = sum(tiene_anotacion_gdc == "Con anotación", na.rm = TRUE)
+    Con_anotacion    = sum(tiene_tratamiento_gdc == "Con anotación", na.rm = TRUE)
   ) %>%
   arrange(desc(Num_pacientes))
 
@@ -478,10 +473,6 @@ p4_edad_tmb
 
 ```{r grafico-mapa, fig.width=10, fig.height=6}
 
-# ==============================================================================
-# OPCIÓN B: Mapa Mundial de Obesidad Femenina (OMS) con países de la cohorte TCGA
-# ==============================================================================
-# Carga el mapa base incluido por defecto en ggplot2 (requiere paquete 'maps', estándar en R)
 mapa_mundo <- map_data("world") %>%
   as_tibble() %>%
   dplyr::filter(region != "Antarctica") %>%
@@ -517,7 +508,6 @@ p5_mapa <- ggplot(mapa_oms, aes(x = long, y = lat, group = group)) +
 
 p5_mapa
 ```
-
 
 # 5. Discusión
 
