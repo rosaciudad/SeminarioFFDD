@@ -7,13 +7,13 @@ title:    |
 author: | 
  | <br>
  | **Rosa Isabel Ciudad Garcia**
- | *[E-mail](mailto:rcg1022@alu.ubu.es)* // 
+ | *[mail](mailto:rcg1022@alu.ubu.es)* // 
  |
  | **Maroua Zaroual Houbbi**
- | *[E-mail](mailto:maroua@ubu.es)* // 
+ | *[mail](mailto:mzh1001@alu.ubu.es)* // 
  |
  | **Maryam El Haouzi**
- | *[E-mail](mailto:maryam@ubu.es)* // 
+ | *[mail](mailto:maryam@ubu.es)* // 
 
 date: |
  | <br>
@@ -70,25 +70,29 @@ library(tidyjson)
 
 ## 1.1. Contexto y motivación
 
-*(Párrafo: el cáncer de mama no es una sola enfermedad; la medicina de precisión busca tratar según el perfil molecular. Justificar la relevancia.)*
+El **cáncer de mama es la neoplasia maligna** más frecuente en mujeres a nivel mundial, pero lejos de constituir una única entidad clínica, engloba un conjunto altamente heterogéneo de tumores con comportamientos biológicos, pronósticos y respuestas terapéuticas muy dispares. Tradicionalmente, su abordaje clínico se basaba en criterios histopatológicos y en la expresión inmunohistoquímica de receptores hormonales (estrógenos y progesterona) y del receptor HER2. Sin embargo, los avances en genómica funcional han permitido establecer clasificaciones moleculares intrínsecas —como el panel PAM50—, que dividen estos tumores en subtipos bien diferenciados:**Luminal A, Luminal B, HER2-enriquecido, Basal-like y Normal-like.**
+
+Comprender qué determina la **agresividad diferencial** de estos subtipos es un **pilar fundamental de la medicina de precisión**. Mientras que los tumores luminales suelen presentar un crecimiento más lento y responden favorablemente a terapias endocrinas, subtipos como el Basal-like (estrechamente ligado al fenotipo triple negativo) o el **HER2-enriquecido** muestran una elevada tasa proliferativa, mayor inestabilidad cromosómica, microambientes tumorales más hipóxicos y un peor pronóstico clínico, careciendo además en muchos casos de dianas hormonales convencionales. Por ello, integrar información molecular de gran escala con datos clínicos, pautas terapéuticas reales y contexto demográfico y epidemiológico resulta esencial para caracterizar la agresividad tumoral y evaluar cómo se traslada el perfil genómico a la práctica clínica.
 
 ## 1.2. Pregunta de investigación
 
-*(Formular la pregunta principal: ¿qué genes se expresan diferencialmente entre subtipos PAM50 y cómo se relacionan con la agresividad tumoral?)*
+¿Cómo varían los **marcadores de agresividad tumoral** —inestabilidad genómica (FGA), carga mutacional (TMB) e hipoxia— y las **pautas terapéuticas** administradas entre los distintos subtipos moleculares PAM50 del cáncer de mama, y qué influencia ejercen las **disparidades raciales** y el contexto epidemiológico d**e obesidad** en su presentación clínica?
 
 ## 1.3. Objetivos
 
-- **Objetivo general:** ...
+- **Objetivo general:** Caracterizar la agresividad biológica, el perfil clínico y el abordaje terapéutico de los distintos subtipos moleculares del cáncer de mama en la cohorte **TCGA-BRCA**, mediante la integración y análisis reproducible en R de fuentes genómicas, clínicas y epidemiológicas.
+
 - **Objetivos específicos:**
-  1.  ...
-  2.  ...
-  3.  ...
+
+  1.  **Integrar y armonizar** datos moleculares de **cBioPortal**, registros clínicos y terapéuticos del **NCI Genomic Data Commons (GDC)** y datos epidemiológicos de la **Organización Mundial de la Salud (OMS)** en un único conjunto de datos relacional.
+  2.  **Comparar la agresividad molecular y el pronóstico** entre subtipos intrínsecos (*Luminal A*, *Luminal B*, *HER2-enriquecido*, *Basal-like* y *Normal-like*) a partir de la fracción del genoma alterado (`FGA`), la carga mutacional no sinónima (`TMB`), la puntuación de hipoxia de Buffa, la edad al diagnóstico y la supervivencia global.
+  3.  **Evaluar la aplicación de la medicina de precisión y los determinantes poblacionales**, analizando la distribución de modalidades terapéuticas por subtipo molecular, las posibles disparidades raciales en el estadio clínico al diagnóstico y el contexto mundial de prevalencia de obesidad femenina.
 
 # 2. Metodología y fuentes de datos
 
 ## 2.1. Fuentes de datos
 
-Para la obtención de los datos clínicos del NCI Genomic Data Commons (GDC) y los datos epidemiológicos de prevalencia de obesidad de la Organización Mundial de la Salud (OMS), se ha optado por la descarga e importación local de sus respectivos archivos (`.json` y `.csv`), en lugar de realizar una conexión directa a sus APIs. Esta decisión metodológica responde a tres motivos principales. En primer lugar, ambas plataformas oficiales presentan una alta inestabilidad en sus servicios web, lo que provocaba fallos recurrentes de timeout o bloqueos durante las peticiones. En segundo lugar, extraer los datos de estas APIs de forma programática habría requerido el uso de librerías de red externas (como `httr2`), las cuales no forman parte del temario ni de las herramientas trabajadas en la asignatura. Por último, y en relación con lo anterior, el paquete `tidyjson` enseñado en clase está diseñado exclusivamente para procesar y aplanar estructuras JSON ya cargadas en el entorno de R, careciendo de funcionalidades para hacer peticiones HTTP. Por tanto, para garantizar la reproducibilidad del análisis y ceñirnos estrictamente a los paquetes y metodologías del curso (`readr` y `jsonlite`), se ha priorizado la robustez de trabajar con una copia local de los ficheros oficiales descargados previamente desde el portal web del GDC y de la OMS.
+ara la integración de datos de este seminario se ha combinado una estrategia híbrida de extracción programática mediante APIs oficiales y carga de ficheros locales, garantizando tanto la actualización de los datos como la reproducibilidad del flujo de trabajo en R.
 
 ### 2.1.1. Importación de las fuentes
 
@@ -147,6 +151,8 @@ names(gdc_raw)
 #gdc_raw <- fromJSON("INPUT/DATA/clinical_tcga_brca.json", flatten = TRUE) %>% as_tibble()
 
 ```
+
+Por el contrario, para los datos epidemiológicos de prevalencia de obesidad de la **Organización Mundial de la Salud (OMS)**, se ha optado exclusivamente por la descarga e importación local del fichero oficial en formato .csv mediante el paquete readr. Esta decisión metodológica se debe a que **la OMS no dispone de un cliente API específico en R** dentro de las herramientas trabajadas en la asignatura, y el intento de lectura directa desde la **URL web del portal generaba errores de importación** y formato en los campos; por ello, el almacenamiento local asegura la integridad estructural de la tabla y evita fallos de compilación en el documento.
 
 ```{r Importaciones de la OMS}
 
@@ -218,12 +224,7 @@ oms_obesidad <- oms_raw %>%
     Dim1ValueCode == "SEX_FMLE",
     Period == max(Period, na.rm = TRUE)
   ) %>%
-  dplyr::select(
-    cod_pais          = SpatialDimValueCode,
-    pais              = Location,
-    ano               = Period,
-    porcentaje_obesas = FactValueNumeric
-  )
+  dplyr::select( cod_pais= SpatialDimValueCode, pais = Location,ano  = Period, porcentaje_obesas = FactValueNumeric)
 
 str(oms_obesidad)
 
@@ -258,7 +259,7 @@ gdc_tratamientos <- gdc_raw %>%
     .groups = "drop"
   )
 
-# 3. Unión 1 a 1 con left_join()
+# 3. unimos 1 a 1 con left_join()
 gdc_limpio <- gdc_pacientes %>%
   left_join(gdc_tratamientos, by = "patientId")
 
@@ -275,16 +276,14 @@ gdc_para_cruce <- gdc_limpio %>%
   mutate(
     cod_pais = case_when(
       demographic.country_of_residence_at_enrollment == "United States" ~ "USA",
-      demographic.country_of_residence_at_enrollment == "Germany"       ~ "DEU",
-      demographic.country_of_residence_at_enrollment == "Russia"        ~ "RUS",
-      demographic.country_of_residence_at_enrollment == "Vietnam"       ~ "VNM",
-      demographic.country_of_residence_at_enrollment == "Poland"        ~ "POL",
-      demographic.country_of_residence_at_enrollment == "Ukraine"       ~ "UKR",
-      demographic.country_of_residence_at_enrollment == "Brazil"        ~ "BRA",
-      demographic.country_of_residence_at_enrollment == "Canada"        ~ "CAN",
-      TRUE                                                            ~ "USA"
-    )
-  )
+      demographic.country_of_residence_at_enrollment == "Germany" ~ "DEU",
+      demographic.country_of_residence_at_enrollment == "Russia" ~ "RUS",
+      demographic.country_of_residence_at_enrollment == "Vietnam" ~ "VNM",
+      demographic.country_of_residence_at_enrollment == "Poland" ~ "POL",
+      demographic.country_of_residence_at_enrollment == "Ukraine" ~ "UKR",
+      demographic.country_of_residence_at_enrollment == "Brazil"~ "BRA",
+      demographic.country_of_residence_at_enrollment == "Canada" ~ "CAN",
+      TRUE ~ "USA"))
 
 # 2. Cruce de las 3 fuentes: inner_join (cBioPortal + GDC) y left_join (OMS)
 datos_cruzados <- cbio_wide %>%
@@ -293,14 +292,13 @@ datos_cruzados <- cbio_wide %>%
   dplyr::filter(!is.na(subtipo)) %>%
   mutate(
     Subtipo = case_when(
-      subtipo == "BRCA_LumA"  ~ "Luminal A",
-      subtipo == "BRCA_LumB"  ~ "Luminal B",
+      subtipo == "BRCA_LumA" ~ "Luminal A",
+      subtipo == "BRCA_LumB" ~ "Luminal B",
       subtipo == "BRCA_Basal" ~ "Basal-like",
-      subtipo == "BRCA_Her2"  ~ "HER2-enriquecido",
-      TRUE                    ~ "Normal-like"
-    ),
-    tiene_tratamiento_gdc = ifelse(tratamientos == "", "Sin registro", "Con registro")
-  )
+      subtipo == "BRCA_Her2"~ "HER2-enriquecido",
+      TRUE ~ "Normal-like"),
+  tiene_tratamiento_gdc = ifelse(tratamientos == "", "Sin registro", "Con registro")
+)
 
 str(datos_cruzados)
 ```
@@ -362,9 +360,9 @@ tabla_razas
 tabla_clinica_gdc <- datos_cruzados %>%
   group_by(Subtipo) %>%
   summarise(
-    Num_pacientes      = length(patientId),
+    Num_pacientes = length(patientId),
     Con_radioterapia = sum(radioterapia == "Yes", na.rm = TRUE),
-    Con_anotacion    = sum(tiene_tratamiento_gdc == "Con anotación", na.rm = TRUE)
+    Con_anotacion = sum(tiene_tratamiento_gdc == "Con anotación", na.rm = TRUE)
   ) %>%
   arrange(desc(Num_pacientes))
 
@@ -382,11 +380,10 @@ p1_inestabilidad <- datos_cruzados %>%
   geom_boxplot(alpha = 0.85, outlier.alpha = 0.4) +
   coord_flip() +
   scale_fill_brewer(palette = "Set2") +
-  labs(
-    title    = "Inestabilidad Genómica según Subtipo Molecular (TCGA-BRCA)",
+  labs(title = "Inestabilidad Genómica según Subtipo Molecular (TCGA-BRCA)",
     subtitle = "Distribución de la fracción del genoma alterado (FGA) por subtipo intrínseco",
-    x        = "Subtipo Molecular",
-    y        = "Fracción del Genoma Alterado"
+    x = "Subtipo Molecular",
+    y = "Fracción del Genoma Alterado"
   ) +
   theme_classic() +
   theme(legend.position = "none")
@@ -405,12 +402,11 @@ p2_tratamientos <- datos_cruzados %>%
   geom_col(position = "fill", colour = "white", linewidth = 0.2) +
   scale_y_continuous(labels = scales::percent) +
   scale_fill_brewer(palette = "Paired") +
-  labs(
-    title    = "Distribución de Pautas Terapéuticas por Subtipo Molecular",
+  labs(title = "Distribución de Pautas Terapéuticas por Subtipo Molecular",
     subtitle = "Integración de clasificación molecular (cBioPortal) y terapias registradas (NCI GDC)",
-    x        = "Subtipo Molecular",
-    y        = "Proporción de Tratamientos",
-    fill     = "Modalidad Terapéutica"
+    x = "Subtipo Molecular",
+    y = "Proporción de Tratamientos",
+    fill = "Modalidad Terapéutica"
   ) +
   theme_classic() +
   theme(axis.text.x = element_text(angle = 30, hjust = 1),
@@ -433,15 +429,12 @@ p3_disparidades <- datos_cruzados %>%
   geom_bar(position = "fill", colour = "white", linewidth = 0.2) +
   scale_y_continuous(labels = scales::percent) +
   scale_fill_viridis_d(option = "plasma") +
-  labs(
-    title    = "Disparidades Raciales en el Estadio Tumoral al Diagnóstico",
+  labs(title = "Disparidades Raciales en el Estadio Tumoral al Diagnóstico",
     subtitle = "Distribución porcentual del estadio AJCC (NCI GDC) según grupo racial",
-    x        = "Grupo Racial",
-    y        = "Proporción de Pacientes",
-    fill     = "Estadio Clínico"
-  ) +
-  theme_classic() +
-  theme(axis.text.x = element_text(angle = 25, hjust = 1))
+    x  = "Grupo Racial",
+    y = "Proporción de Pacientes",
+    fill = "Estadio Clínico"
+  ) + theme_classic() + theme(axis.text.x = element_text(angle = 25, hjust = 1))
 
 p3_disparidades
 ```
@@ -456,12 +449,11 @@ p4_edad_tmb <- datos_cruzados %>%
   geom_smooth(method = "lm", se = FALSE, linewidth = 0.9) +
   scale_y_log10() +
   scale_colour_brewer(palette = "Set1") +
-  labs(
-    title    = "Relación entre Edad al Diagnóstico y Carga Mutacional (TMB)",
+  labs(title = "Relación entre Edad al Diagnóstico y Carga Mutacional (TMB)",
     subtitle = "Escala logarítmica para TMB no sinónimo estratificada por subtipo molecular",
-    x        = "Edad al diagnóstico (años)",
-    y        = "TMB (mutaciones/Mb, escala log10)",
-    colour   = "Subtipo Molecular"
+    x = "Edad al diagnóstico (años)",
+    y  = "TMB (mutaciones/Mb, escala log10)",
+    colour = "Subtipo Molecular"
   ) +
   theme_classic() +
   theme(legend.position = "bottom")
@@ -479,12 +471,10 @@ mapa_mundo <- map_data("world") %>%
   mutate(
     # Armonizamos nombres clave para cruzar con la tabla 'oms_obesidad'
     pais_clave = case_when(
-      region == "USA"    ~ "United States of America",
+      region == "USA" ~ "United States of America",
       region == "Russia" ~ "Russian Federation",
-      region == "UK"     ~ "United Kingdom",
-      TRUE               ~ region
-    )
-  )
+      region == "UK" ~ "United Kingdom",
+      TRUE ~ region))
 
 # Unimos el mapa con los datos de la OMS
 mapa_oms <- mapa_mundo %>%
@@ -495,16 +485,11 @@ p5_mapa <- ggplot(mapa_oms, aes(x = long, y = lat, group = group)) +
   scale_fill_viridis_c(option = "magma", direction = -1, na.value = "grey92") +
   coord_fixed(1.3) +
   labs(
-    title    = "Contexto Epidemiológico Global: Prevalencia de Obesidad Femenina (OMS)",
+    title = "Contexto Epidemiológico Global: Prevalencia de Obesidad Femenina (OMS)",
     subtitle = "Porcentaje de mujeres adultas con IMC ≥ 30 kg/m² (último año disponible)",
-    fill     = "Obesidad (%)"
-  ) +
-  theme_void() +
-  theme(
-    legend.position = "bottom",
-    plot.title      = element_text(face = "bold", hjust = 0.5),
-    plot.subtitle   = element_text(hjust = 0.5)
-  )
+    fill= "Obesidad (%)") +
+  theme_void() + theme(legend.position = "bottom", plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5))
 
 p5_mapa
 ```
