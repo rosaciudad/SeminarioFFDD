@@ -13,7 +13,7 @@ author: |
  | *[mail](mailto:mzh1001@alu.ubu.es)* // 
  |
  | **Maryam El Haouzi**
- | *[mail](mailto:mex1057@ubu.es)* // 
+ | *[mail](mailto:mex1057@alu.ubu.es)* // 
 
 date: |
  | <br>
@@ -516,7 +516,7 @@ El mapamundi elaborado con los datos más recientes de la OMS evidencia una marc
 
 ## 5.1. Interpretación de los hallazgos
 
-Los resultados muestran que los subtipos moleculares PAM50 no se comportan igual. Los tres marcadores de agresividad que hemos analizado siguen el mismo patrón: **Basal-like** es el subtipo con más alteraciones y **Luminal A** el que menos tiene.
+Los resultados muestran que los subtipos moleculares PAM50 no se comportan igual. Los tres marcadores de agresividad que hemos analizado siguen el mismo patrón: **Basal-like** es el subtipo con más alteraciones y **Luminal A** y **Normal-like** los que menos tienen.
 
 En el caso de la inestabilidad genómica (FGA), Basal-like tiene los valores más altos, seguido de Luminal B y HER2-enriquecido, mientras que Luminal A y Normal-like tienen genomas mucho más estables. Con la hipoxia pasa algo parecido: Basal-like tiene la puntuación media más alta (17,78) y Luminal A la más baja (-22,96). La carga mutacional (TMB) también es mayor en Basal-like y HER2-enriquecido. Esto coincide con lo que se describe en la bibliografía, donde los subtipos Basal-like y HER2-enriquecido se consideran los más agresivos y Luminal A el de mejor pronóstico (Perou et al., 2000; Cancer Genome Atlas Network, 2012).
 
@@ -536,6 +536,7 @@ Por último, el mapa de la OMS muestra que Estados Unidos, de donde proceden la 
 ## 5.3. Conclusiones
 
 Integrando datos de cBioPortal, el GDC y la OMS hemos podido caracterizar los subtipos de cáncer de mama de la cohorte TCGA-BRCA. Los resultados confirman que Basal-like y HER2-enriquecido son los subtipos más agresivos a nivel genómico, y que el tratamiento se adapta al subtipo molecular. Además, el cruce de fuentes nos ha permitido ver la influencia de factores como la raza o el contexto de obesidad, algo que no se podría estudiar con una sola base de datos.
+
 # 6. Reproducibilidad
 
 ```{r session-info}
