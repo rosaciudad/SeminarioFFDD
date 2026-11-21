@@ -391,6 +391,8 @@ p1_inestabilidad <- datos_cruzados %>%
 p1_inestabilidad
 ```
 
+Se observa un gradiente claro de inestabilidad cromosómica (Fracción del Genoma Alterado, `FGA`) que confirma la agresividad diferencial de cada subtipo. **Basal-like** presenta la mayor mediana de alteración genómica (\~0,47) y el rango intercuartílico más desplazado hacia valores altos, seguido de **Luminal B** (\~0,39) y **HER2-enriquecido** (\~0,30). En el extremo opuesto, **Luminal A** (\~0,18) y **Normal-like** (\~0,01) muestran genomas mucho más estables, lo que concuerda con su crecimiento más lento y mejor pronóstico clínico, aunque *Luminal A* exhibe numerosos valores atípicos (*outliers*) de pacientes con alta inestabilidad que podrían comportarse de forma más agresiva.
+
 ## 4.3. Medicina de precisión en acción: tratamientos por subtipo
 
 ```{r grafico-2-tratamientos, fig.width=10, fig.height=6}
@@ -414,6 +416,8 @@ p2_tratamientos <- datos_cruzados %>%
 
 p2_tratamientos
 ```
+
+La gráfica refleja cómo la biología del tumor guía la decisión clínica dentro de la medicina de precisión. En **Luminal A** y **Luminal B**, la **terapia hormonal** ocupa una proporción muy destacada al tratarse de tumores dependientes de receptores de estrógenos y progesterona. Por el contrario, en **Basal-like** la terapia hormonal es prácticamente inexistente y predominan la **quimioterapia citotóxica** y la radioterapia externa, ya que al carecer de dianas hormonales y sobreexpresión de HER2 estas pacientes no son candidatas a terapias endocrinas convencionales.
 
 ## 4.4. Disparidades raciales en la distribución de subtipos
 
@@ -439,6 +443,8 @@ p3_disparidades <- datos_cruzados %>%
 p3_disparidades
 ```
 
+- **3. Disparidades Raciales en el Estadio Tumoral al Diagnóstico (`p3_disparidades`):** Al analizar la distribución porcentual del estadio clínico AJCC según el grupo racial, se observa que en las tres poblaciones mayoritarias de la cohorte (*Asian*, *Black or African American* y *White*) más de la mitad de los diagnósticos se concentran en **Estadios II (principalmente IIA y IIB)**. No obstante, existen diferencias relevantes en los extremos de gravedad: las pacientes de origen **afroamericano** presentan una **menor proporción de diagnósticos en estadios iniciales (Estadios I y IA)** y, paralelamente, un **mayor peso relativo de estadios localmente avanzados (Estadios IIIA, IIIB y IIIC)** en comparación con las mujeres blancas y asiáticas. Este desplazamiento hacia estadios más tardíos responde a una doble dimensión: por un lado, a factores **biológicos y moleculares**, ya que en la población afroamericana existe una mayor prevalencia del subtipo **Basal-like**, caracterizado por una alta tasa proliferativa y rápida progresión clínica (como se constata al cruzar con la Tabla 2); y, por otro, a **determinantes socioeconómicos y estructurales**, como posibles barreras en el acceso temprano a programas de cribado mamográfico y atención especializada o otras barreras. Como estos datos fueron recopilados en EEUU, es bien sabido que la sanidad esta privatizada y no todos tienen acceso a esta. Asimismo, cabe señalar que grupos minoritarios en la muestra (como *American Indian or Alaska Native*) muestran barras homogéneas debido a su reducido tamaño muestral ($n$ muy bajo), lo que impide extraer inferencias poblacionales robustas para ese subgrupo.
+
 ## 4.5. Edad, TMB y estado vital
 
 ```{r edad-tmb, fig.width=10, fig.height=6}
@@ -460,6 +466,8 @@ p4_edad_tmb <- datos_cruzados %>%
 
 p4_edad_tmb
 ```
+
+La escala logarítmica del `TMB` muestra una pendiente ligeramente ascendente con la edad en todos los subtipos. Esto es debido a la acumulación progresiva de mutaciones somáticas a lo largo de la vida, siendo especialmente pronunciada en el subtipo **HER2-enriquecido**, que alcanza los valores más altos en pacientes de edad avanzada. Asimismo, los subtipos más agresivos (**Basal-like** y **HER2-enriquecido**) se sitúan sistemáticamente por encima de **Luminal A** y **Normal-like** en prácticamente todo el rango de edad, confirmando una mayor tasa mutacional basal. Por ello, edades mas avanzadas requieren revisiones periodicas para prevenir.
 
 ## 4.6. Contexto mundial: obesidad femenina y subtipos
 
@@ -493,6 +501,8 @@ p5_mapa <- ggplot(mapa_oms, aes(x = long, y = lat, group = group)) +
 
 p5_mapa
 ```
+
+El mapamundi elaborado con los datos más recientes de la OMS evidencia una marcada heterogeneidad geográfica en la prevalencia de obesidad femenina adulta ($\text{IMC} \ge 30\text{ kg/m}^2$). Mientras que países de Asia Oriental (como Japón o China) y gran parte de África subsahariana registran tasas inferiores al 10–15 % (tonos amarillo claro), regiones como **Norteamérica —destacando Estados Unidos con cifras superiores al 40 %—, Oriente Medio, el norte de África (especialmente Egipto) y el cono sur americano** presentan las prevalencias más elevadas del planeta (tonos magenta y púrpura oscuro). Desde el punto de vista oncológico, la obesidad constituye un factor de riesgo consolidado para el desarrollo y progresión del cáncer de mama (especialmente en mujeres posmenopáusicas con tumores receptores hormonales positivos, como *Luminal A* y *Luminal B*), debido al aumento de la aromatización periférica de estrógenos en el tejido adiposo, la resistencia a la insulina y un estado de inflamación crónica de bajo grado. Dado que la inmensa mayoría de las pacientes incluidas en la cohorte **TCGA-BRCA** proceden de instituciones clínicas estadounidenses (tal como se observa al cruzar con la variable de país de residencia del GDC), este mapa permite contextualizar el entorno poblacional de alto riesgo metabólico en el que se origina la muestra estudiada. No obstante, al integrar un indicador agregado a nivel nacional con datos clínicos individuales, es imprescindible cautela metodológica para no incurrir en una **falacia ecológica**, ya que una elevada prevalencia poblacional en el país de origen no permite inferir el índice de masa corporal individual de cada paciente analizada.
 
 # 5. Discusión
 
