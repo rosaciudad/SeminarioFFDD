@@ -2,7 +2,7 @@
 
 ## Genómica y medicina de precisión en cáncer de mama
 
-Este repositorio recoge el seminario de la asignatura **Fuentes de Datos Biomédicas y Web Semántica** (#8235) del Grado en Ingeniería de la Salud de la Universidad de Burgos.
+Este repositorio recoge el seminario de la asignatura **Fuentes de Datos Biomédicas y Web Semántica**  del Grado en Ingeniería de la Salud de la Universidad de Burgos.
 
 ## Descripción del proyecto
 
