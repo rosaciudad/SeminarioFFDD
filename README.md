@@ -22,19 +22,11 @@ En este seminario integramos en R datos de tres fuentes públicas para estudiar 
 
 ## Estructura del repositorio
 
-```
-SeminarioFFDD/
-├── Analisis_Cancer_Mama.Rmd      # Documento principal: código y explicación
-├── Analisis_Cancer_Mama.html     # Informe final generado con Knit
-├── Analisis_Cancer_Mama          # Proyecto de RStudio
-├── INPUT/
-│   ├── DATA/
-│   │   ├── clinical_tcga_brca.json   # Copia local de los datos del GDC (respaldo)
-│   │   └── obesidad_oms.csv          # Datos de obesidad de la OMS
-│   └── IMAGES/
-│       └── fondo.jpg                 # Imagen de fondo del informe
-├── .gitignore
-└── README.md
+- `Analisis_Cancer_Mama.Rmd`: documento principal con el código y la explicación.
+- `Analisis_Cancer_Mama.html`: informe final generado con Knit.
+- `Analisis_Cancer_Mama`: proyecto de RStudio.
+- `INPUT/DATA/`: datos locales (`clinical_tcga_brca.json` del GDC y `obesidad_oms.csv` de la OMS).
+- `INPUT/IMAGES/`: imagen de fondo del informe.
 ```
 
 ## Cómo reproducir el análisis
