@@ -13,7 +13,7 @@ author: |
  | *[mail](mailto:mzh1001@alu.ubu.es)* // 
  |
  | **Maryam El Haouzi**
- | *[mail](mailto:maryam@ubu.es)* // 
+ | *[mail](mailto:mex1057@ubu.es)* // 
 
 date: |
  | <br>
@@ -177,7 +177,15 @@ cat("Columnas OMS:", paste(names(oms_raw)[1:5], collapse = ", "), "...\n")
 
 ## 2.2. Flujo de análisis
 
-*(Diagrama o lista numerada: importación → limpieza/desanidado → cruce → análisis descriptivo → gráficos → exportación.)*
+El trabajo se ha organizado en varios pasos, desde la descarga de los datos hasta la obtención de los resultados:
+
+1. **Importación de los datos.** Se descargan los datos clínicos y moleculares de cBioPortal y los datos clínicos y de tratamientos del GDC a través de sus APIs, y los datos de obesidad de la OMS desde un fichero CSV.
+2. **Limpieza.** Se pasa la tabla de cBioPortal de formato largo a formato ancho, se filtran los datos de la OMS (solo mujeres y el último año disponible) y se seleccionan las variables que nos interesan.
+3. **Desanidado del JSON del GDC.** Se aplanan los bloques anidados (datos demográficos, diagnósticos y tratamientos) para tener una fila por paciente.
+4. **Cruce de las fuentes.** Se unen los datos de cBioPortal y del GDC por el identificador de la paciente y después se añaden los datos de la OMS por país.
+5. **Análisis descriptivo.** Se crean tablas resumen por subtipo PAM50, por raza y por tratamiento.
+6. **Visualización.** Se hacen gráficos para comparar la inestabilidad genómica, los tratamientos, el estadio al diagnóstico, la carga mutacional y la obesidad.
+7. **Interpretación.** Por último, se comentan los resultados para responder a la pregunta de investigación.
 
 # 3. Procesamiento y limpieza
 
@@ -508,7 +516,15 @@ El mapamundi elaborado con los datos más recientes de la OMS evidencia una marc
 
 ## 5.1. Interpretación de los hallazgos
 
-*(Conectar resultados con la pregunta de investigación.)*
+Los resultados muestran que los subtipos moleculares PAM50 no se comportan igual. Los tres marcadores de agresividad que hemos analizado siguen el mismo patrón: **Basal-like** es el subtipo con más alteraciones y **Luminal A** el que menos tiene.
+
+En el caso de la inestabilidad genómica (FGA), Basal-like tiene los valores más altos, seguido de Luminal B y HER2-enriquecido, mientras que Luminal A y Normal-like tienen genomas mucho más estables. Con la hipoxia pasa algo parecido: Basal-like tiene la puntuación media más alta (17,78) y Luminal A la más baja (-22,96). La carga mutacional (TMB) también es mayor en Basal-like y HER2-enriquecido. Esto coincide con lo que se describe en la bibliografía, donde los subtipos Basal-like y HER2-enriquecido se consideran los más agresivos y Luminal A el de mejor pronóstico (Perou et al., 2000; Cancer Genome Atlas Network, 2012).
+
+En cuanto a los tratamientos, vemos que la biología del tumor influye en la decisión clínica. Las pacientes con tumores luminales reciben con frecuencia terapia hormonal, porque sus tumores dependen de los estrógenos. En cambio, en Basal-like la terapia hormonal casi no aparece y predominan la quimioterapia y la radioterapia. Esto es un ejemplo claro de medicina de precisión: el tratamiento se elige según las características moleculares del tumor.
+
+También hemos encontrado diferencias entre grupos raciales. En las pacientes afroamericanas, el subtipo Basal-like supone aproximadamente un tercio de los casos (53 de 159), mientras que en las pacientes blancas es alrededor del 16 % (106 de 678). Además, las pacientes afroamericanas se diagnostican con menos frecuencia en estadios iniciales. Esto concuerda con estudios anteriores que describen una mayor frecuencia de tumores basal-like en mujeres afroamericanas (Carey et al., 2006). Aun así, estas diferencias no se explican solo por la biología, ya que también pueden influir el acceso al cribado y a la atención sanitaria.
+
+Por último, el mapa de la OMS muestra que Estados Unidos, de donde proceden la mayoría de las pacientes de TCGA-BRCA, tiene una de las prevalencias de obesidad femenina más altas del mundo. La obesidad es un factor de riesgo de cáncer de mama en mujeres posmenopáusicas (Lauby-Secretan et al., 2016). Sin embargo, como se trata de un dato a nivel de país, solo sirve como contexto y no se puede relacionar directamente con cada paciente.
 
 ## 5.2. Limitaciones
 
@@ -519,8 +535,7 @@ El mapamundi elaborado con los datos más recientes de la OMS evidencia una marc
 
 ## 5.3. Conclusiones
 
-*(2–3 líneas: ¿se cumple el objetivo general? ¿qué aporta el cruce de fuentes?)*
-
+Integrando datos de cBioPortal, el GDC y la OMS hemos podido caracterizar los subtipos de cáncer de mama de la cohorte TCGA-BRCA. Los resultados confirman que Basal-like y HER2-enriquecido son los subtipos más agresivos a nivel genómico, y que el tratamiento se adapta al subtipo molecular. Además, el cruce de fuentes nos ha permitido ver la influencia de factores como la raza o el contexto de obesidad, algo que no se podría estudiar con una sola base de datos.
 # 6. Reproducibilidad
 
 ```{r session-info}
@@ -529,4 +544,17 @@ sessionInfo()
 
 # 7. Referencias
 
-*(Bibliografía en formato APA: TCGA, cBioPortal, NCI-GDC, OMS GHO, DESeq2, etc.)*
+- Buffa, F. M., Harris, A. L., West, C. M., & Miller, C. J. (2010). Large meta-analysis of multiple cancers reveals a common, compact and highly prognostic hypoxia metagene. *British Journal of Cancer, 102*(2), 428–435. https://doi.org/10.1038/sj.bjc.6605450
+- Cancer Genome Atlas Network. (2012). Comprehensive molecular portraits of human breast tumours. *Nature, 490*(7418), 61–70. https://doi.org/10.1038/nature11412
+- Carey, L. A., Perou, C. M., Livasy, C. A., Dressler, L. G., Cowan, D., Conway, K., ... & Millikan, R. C. (2006). Race, breast cancer subtypes, and survival in the Carolina Breast Cancer Study. *JAMA, 295*(21), 2492–2502. https://doi.org/10.1001/jama.295.21.2492
+- Cerami, E., Gao, J., Dogrusoz, U., Gross, B. E., Sumer, S. O., Aksoy, B. A., ... & Schultz, N. (2012). The cBio cancer genomics portal: An open platform for exploring multidimensional cancer genomics data. *Cancer Discovery, 2*(5), 401–404. https://doi.org/10.1158/2159-8290.CD-12-0095
+- Gao, J., Aksoy, B. A., Dogrusoz, U., Dresdner, G., Gross, B., Sumer, S. O., ... & Schultz, N. (2013). Integrative analysis of complex cancer genomics and clinical profiles using the cBioPortal. *Science Signaling, 6*(269), pl1. https://doi.org/10.1126/scisignal.2004088
+- Grossman, R. L., Heath, A. P., Ferretti, V., Varmus, H. E., Lowy, D. R., Kibbe, W. A., & Staudt, L. M. (2016). Toward a shared vision for cancer genomic data. *New England Journal of Medicine, 375*(12), 1109–1112. https://doi.org/10.1056/NEJMp1607591
+- Hoadley, K. A., Yau, C., Hinoue, T., Wolf, D. M., Lazar, A. J., Drill, E., ... & Laird, P. W. (2018). Cell-of-origin patterns dominate the molecular classification of 10,000 tumors from 33 types of cancer. *Cell, 173*(2), 291–304. https://doi.org/10.1016/j.cell.2018.03.022
+- Lauby-Secretan, B., Scoccianti, C., Loomis, D., Grosse, Y., Bianchini, F., & Straif, K. (2016). Body fatness and cancer: Viewpoint of the IARC Working Group. *New England Journal of Medicine, 375*(8), 794–798. https://doi.org/10.1056/NEJMsr1606602
+- NCD Risk Factor Collaboration (NCD-RisC). (2024). Worldwide trends in underweight and obesity from 1990 to 2022: A pooled analysis of 3663 population-representative studies with 222 million children, adolescents, and adults. *The Lancet, 403*(10431), 1027–1050. https://doi.org/10.1016/S0140-6736(23)02750-2
+- Parker, J. S., Mullins, M., Cheang, M. C. U., Leung, S., Voduc, D., Vickery, T., ... & Bernard, P. S. (2009). Supervised risk predictor of breast cancer based on intrinsic subtypes. *Journal of Clinical Oncology, 27*(8), 1160–1167. https://doi.org/10.1200/JCO.2008.18.1370
+- Perou, C. M., Sørlie, T., Eisen, M. B., van de Rijn, M., Jeffrey, S. S., Rees, C. A., ... & Botstein, D. (2000). Molecular portraits of human breast tumours. *Nature, 406*(6797), 747–752. https://doi.org/10.1038/35021093
+- National Cancer Institute. (s.f.). *GDC Data Portal: TCGA-BRCA*. https://portal.gdc.cancer.gov/projects/TCGA-BRCA
+- Organización Mundial de la Salud. (s.f.). *Obesity among adults, BMI ≥ 30, prevalence (age-standardized estimate) (%)*. Global Health Observatory. https://www.who.int/data/gho
+- R Core Team. (2025). *R: A language and environment for statistical computing*. R Foundation for Statistical Computing. https://www.R-project.org/
