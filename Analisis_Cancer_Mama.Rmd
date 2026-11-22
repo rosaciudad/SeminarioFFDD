@@ -7,13 +7,13 @@ title:    |
 author: | 
  | <br>
  | **Rosa Isabel Ciudad Garcia**
- | *[mail](mailto:rcg1022@alu.ubu.es)* // 
+ | *[rcg1022@alu.ubu.es](mailto:rcg1022@alu.ubu.es)* // 
  |
  | **Maroua Zaroual Houbbi**
- | *[mail](mailto:mzh1001@alu.ubu.es)* // 
+ | *[mzh1001@alu.ubu.es](mailto:mzh1001@alu.ubu.es)* // 
  |
  | **Maryam El Haouzi**
- | *[mail](mailto:mex1057@alu.ubu.es)* // 
+ | *[mex1057@alu.ubu.es](mailto:mex1057@alu.ubu.es)* // 
 
 date: |
  | <br>
@@ -92,7 +92,7 @@ Comprender qué determina la **agresividad diferencial** de estos subtipos es un
 
 ## 2.1. Fuentes de datos
 
-ara la integración de datos de este seminario se ha combinado una estrategia híbrida de extracción programática mediante APIs oficiales y carga de ficheros locales, garantizando tanto la actualización de los datos como la reproducibilidad del flujo de trabajo en R.
+Para la integración de datos de este seminario se ha combinado una estrategia híbrida de extracción programática mediante APIs oficiales y carga de ficheros locales, garantizando tanto la actualización de los datos como la reproducibilidad del flujo de trabajo en R.
 
 ### 2.1.1. Importación de las fuentes
 
@@ -127,11 +127,11 @@ En este bloque se accede de forma programática al portal **Genomic Data Commons
 
 ```{r Importaciones de NCI GDC}
 
-#Instalación del paquete(una unica ejecucion)
-if (!require("BiocManager", quietly = TRUE)) {
-  install.packages("BiocManager")
-}
-BiocManager::install("GenomicDataCommons")
+#Instalación del paquete(una unica ejecucion)->descomentar si es la primera vez que renderiza el documento
+#if (!require("BiocManager", quietly = TRUE)) {
+#  install.packages("BiocManager")
+#}
+#BiocManager::install("GenomicDataCommons") 
 
 #Importacion
 library(GenomicDataCommons)
@@ -179,13 +179,13 @@ cat("Columnas OMS:", paste(names(oms_raw)[1:5], collapse = ", "), "...\n")
 
 El trabajo se ha organizado en varios pasos, desde la descarga de los datos hasta la obtención de los resultados:
 
-1. **Importación de los datos.** Se descargan los datos clínicos y moleculares de cBioPortal y los datos clínicos y de tratamientos del GDC a través de sus APIs, y los datos de obesidad de la OMS desde un fichero CSV.
-2. **Limpieza.** Se pasa la tabla de cBioPortal de formato largo a formato ancho, se filtran los datos de la OMS (solo mujeres y el último año disponible) y se seleccionan las variables que nos interesan.
-3. **Desanidado del JSON del GDC.** Se aplanan los bloques anidados (datos demográficos, diagnósticos y tratamientos) para tener una fila por paciente.
-4. **Cruce de las fuentes.** Se unen los datos de cBioPortal y del GDC por el identificador de la paciente y después se añaden los datos de la OMS por país.
-5. **Análisis descriptivo.** Se crean tablas resumen por subtipo PAM50, por raza y por tratamiento.
-6. **Visualización.** Se hacen gráficos para comparar la inestabilidad genómica, los tratamientos, el estadio al diagnóstico, la carga mutacional y la obesidad.
-7. **Interpretación.** Por último, se comentan los resultados para responder a la pregunta de investigación.
+1.  **Importación de los datos.** Se descargan los datos clínicos y moleculares de cBioPortal y los datos clínicos y de tratamientos del GDC a través de sus APIs, y los datos de obesidad de la OMS desde un fichero CSV.
+2.  **Limpieza.** Se pasa la tabla de cBioPortal de formato largo a formato ancho, se filtran los datos de la OMS (solo mujeres y el último año disponible) y se seleccionan las variables que nos interesan.
+3.  **Desanidado del JSON del GDC.** Se aplanan los bloques anidados (datos demográficos, diagnósticos y tratamientos) para tener una fila por paciente.
+4.  **Cruce de las fuentes.** Se unen los datos de cBioPortal y del GDC por el identificador de la paciente y después se añaden los datos de la OMS por país.
+5.  **Análisis descriptivo.** Se crean tablas resumen por subtipo PAM50, por raza y por tratamiento.
+6.  **Visualización.** Se hacen gráficos para comparar la inestabilidad genómica, los tratamientos, el estadio al diagnóstico, la carga mutacional y la obesidad.
+7.  **Interpretación.** Por último, se comentan los resultados para responder a la pregunta de investigación.
 
 # 3. Procesamiento y limpieza
 
@@ -193,9 +193,9 @@ En esta sección se van a transformar los datos de tal manera que estos puedan s
 
 ## 3.1. Limpieza de cBioPortal
 
-La API de cBioPortal devuelve los datos en el llamado **formato largo**, es decir, cada fila no se corresponde con un paciente sino con un único atributo que recibe el nombre de clinicalAttributeId acompañado de un valor (value). Esto provoca que **una misma paciente aparezca repetida en un gran número de filas seguidas**, imposibilitando el cruce de datos con otras fuentes o la generación de comparaciones gráficas de variables.
+La API de cBioPortal devuelve los datos con identificadores en inglés. Estos datos pueden **contener registros a nivel de muestra y no a nivel de paciente**, dificultando la unión con otras tablas.
 
-Para explicarlo de forma más sencilla, en este formato largo, los distintos atributos de un paciente como la edad, la raza, el sexo o el estado vital aparecen en diferentes filas cuando lo que necesitamos es una relación en la que **el paciente sea una tupla y sus atributos sean las variables** antes mencionadas.
+Para poder analizarlos y cruzarlos fácilmente, necesitamos **reorganizar la tabla** de manera que cada fila corresponda a un único paciente y cada columna a uno de sus datos.
 
 ```{r limpieza-cbioportal}
 cbio_wide <- cbio_raw %>%
@@ -218,13 +218,11 @@ cbio_wide <- cbio_raw %>%
 str(cbio_wide)
 ```
 
-Para solucionar este problema se han agrupado todas las filas que comparten un mismo identificador de paciente para después crear 8 atributos correspondientes a los datos recogidos para cada paciente en el fichero. Además, se ha traducido el nombre de estos para facilitar la lectura y comprensión del conjunto.
-
-Cabe destacar que dentro de summarise(), fitramos la columna value buscando el nombre del atributo en clinicalAttributeId añadiendo [1] al final para garantizar que R extraiga un sólo elemento por casilla, asegurándonos, además de que si hay algún valor ausente, **R rellenará el con NA**.
+Para solucionar este problema, hemos convertido a tibble la tabla original. Después, tomamos los 12 primeros caracteres del ID del paciente y renombramos las variables para facilitar el entendimiento del conjunto de datos. Finalmente, hemos añadido una columna donde todos los registros tienen el valor USA con el fin de poder cruzar los datos georgráficos más adelante.
 
 ## 3.2. Limpieza de la OMS
 
-Ahora, debemos realizar la limpieza de los datos de obesidad proporcionados por la Organización Mundial de la Salud. Para ello, se han filtrado los datos para utilizar únicamente los **procedentes de mujeres** ya que el cáncer de mama es una enfermedad mayoritariamente femenina y la inclusión de datos procedentes de hombres podría perjudicar el posterior análisis estadístico ya que la incidencia en ellos es casi nula. Además se van a trabajar únicamente los **datos generados este último año**.
+Ahora, debemos realizar la limpieza de los datos de obesidad proporcionados por la Organización Mundial de la Salud. Para ello, se han filtrado los datos para utilizar únicamente los **procedentes de mujeres** ya que el cáncer de mama es una enfermedad mayoritariamente femenina y la inclusión de datos procedentes de hombres podría perjudicar el posterior análisis estadístico ya que la incidencia en ellos es casi nula. Además se van a trabajar únicamente los **datos generados en el último año disponible**.
 
 ```{r limpieza-oms}
 oms_obesidad <- oms_raw %>%
@@ -232,17 +230,26 @@ oms_obesidad <- oms_raw %>%
     Dim1ValueCode == "SEX_FMLE",
     Period == max(Period, na.rm = TRUE)
   ) %>%
-  dplyr::select( cod_pais= SpatialDimValueCode, pais = Location,ano  = Period, porcentaje_obesas = FactValueNumeric)
+  dplyr::select( cod_pais= SpatialDimValueCode, pais = Location, ano  = Period, porcentaje_obesas = FactValueNumeric)
 
 str(oms_obesidad)
 
 ```
 
-Además, se han seleccionado para el análisis exclusivamente 4 columnas que se han considerado relevamtes para este. A estos atributos se les ha cambiado el nombre para facilitar la comprensión de los datos.
+Además, se han seleccionado para el análisis exclusivamente 4 columnas que se han considerado relevantes para este. A estos atributos se les ha cambiado el nombre para facilitar la comprensión de los datos.
 
 ## 3.3. Desanidado del JSON del GDC
 
-El último paso antes de realizar el cruce de los datos es **aplanar y consolidar el último de los JSON**. Para ello, nos quedaremos con las columnas case_submitter_id, category, classification y notes a las que hemos cambiado los nombres para facilitar la comprensión del conjunto de datos. Después, hemos agrupado dicho dataset a partir de la columna case_submitter_id y hemos garantizado la **generación de una fila por paciente**.
+El último paso antes de realizar el cruce de los datos es **aplanar y consolidar la estructura anidada del último de los JSON**. Para llevarlo a cabo y obtener una única fila por paciente se han seguido una serie de pasos:
+
+- Se ha normalizado el identificador del paciente. Además, se han seleccionado primary_site, disease_type y se han desplagado en columnas los atributos anidados de demographic mediante unnest_wider().
+- Se ha llevado a cabo la consolidación de los de diagnósticos y tratamientos; para ello se han desanidado las listas diagnoses y diagnoses_treatments con unnest(). A continuación, se han agrupado por patientId para extraer el primer estadio patológico disponible (estadio_gdc) y concatenado en una única cadena todos los tratamientos únicos recibidos por cada paciente (tratamientos).
+- Por último, se han combinado ambas tablas mediante left_join() usando patientId como clave, obteniendo una tabla que podemos integrar con el resto de fuentes.
+
+<div style="background-color: #fce4ec; border-left: 5px solid #801e5b; padding: 12px 16px; margin: 15px 0; border-radius: 4px;">
+<strong>Importante:</strong> <code>unnest_wider()</code> despliega los datos demográficos en nuevas columnas, mientras que <code>unnest()</code> expande en varias filas los diagnósticos y tratamientos de cada paciente.
+</div>
+
 
 ```{r desanidado-gdc}
 library(tidyverse)
@@ -276,7 +283,9 @@ str(gdc_limpio)
 
 ## 3.4. Cruce de las tres fuentes
 
-Por último, vamos a cruzar los datos con el objetivo de poder generar visualizaciones y tablas que nos permitan efectuar un análisis crítico de los datasets encontrados. En este apartado se van a cruzar únicamenre los datos de cBioPortal y GDC. Possteriormente, se cruzaran con estos los datos de la OMS sobre obesidad que hemos limpiado con el fin de generar gráficos que permitan responder a las preguntas del seminario.
+Por último, vamos a **cruzar los datos** con el objetivo de poder generar visualizaciones y tablas que nos permitan efectuar un análisis crítico de los datasets encontrados. En este apartado se van a cruzar los datos procedentes de las tres fuentes. Para ello, hemos estandarizado la variable geográfica del GDC (`demographic.country_of_residence_at_enrollment`), transformando el nombre de cada país a su código internacional ISO-3.
+
+A continuación, hemos realizado un **cruce a nivel de paciente** entre las relaciones procedentes de cBioPortal y GDC mediante un `inner_join()` utilizando el identificador `patientId`. Hemos incorporado, además, los **datos de obesidad** procedentes de la OMS mediante un `left_join()`
 
 ```{r cruce-fuentes}
 # 1. Mapeamos el país de residencia del GDC a código ISO-3 para cruzar con la OMS
@@ -311,15 +320,19 @@ datos_cruzados <- cbio_wide %>%
 str(datos_cruzados)
 ```
 
-En este código, se ha utilizado un left join para unir las dos relaciones anteriores a través del id del paciente. Es imporatante mencionar que se ha filtrado por subtipo y se ha cambiado el nombre de cada uno de los mismos para simplificar la relación resultante. Se ha añadido un atributo `tiene_anotacion_gdc` que recoge si existe algún factor extra que deba considerarse como antecedentes de cáncer u otros.
+Tras la unión de las 3 fuentes hemos aplicado un **filtrado** para conservar exclusivamente las muestras que disponen de una clasificación molecular válida, es decir, aquellas que presentan un subtipo válido. Posteriormente, se han recodificado las etiquetas de dichos subtipos para darles un nombre más fácil de entender.
+
+Por último, se ha generado una variable `tiene_tratamiento_gdc` que permite identificar qué pacientes cuentan con **información terapeútica** registrada en la base de datos de GDC.
 
 # 4. Resultados
 
 ## 4.1. Análisis descriptivo
 
-Se van a realizar una serie de tablas que resumen la información facilitando el análisis crítico de la información proporcionada por los datos. Además, estas tablas nos van a servir de base para construir muchas de las visualizaciones que nos ayudarán a responder a las preguntas.
+Se van a realizar una serie de tablas que resumen la información facilitando el análisis crítico de la información proporcionada por los datos.
 
 ### Tabla 1: Tabla por subtipo molecular PAM50.
+
+Hemos construido una tabla que presenta ciertas estadísticas relativas a los diferentes subtipos de cáncer de mama. Para ello, hemos asegurado que ciertos datos se almacenen de **forma númerica** para poder operar matemáticamente con ellos. Después, hemos dividido el conjunto de datos en los 5 grupos correspondientes a los subtipos PAM50 con `group_by()`y por último, hemos **calculado y presentado las estadísticas** deseadas.
 
 ```{r descriptivos-subtipo}
 tabla_subtipos <- datos_cruzados %>%
@@ -342,8 +355,18 @@ tabla_subtipos <- datos_cruzados %>%
 tabla_subtipos
 
 ```
+En la tabla anterior podemos observar un claro **predominio del subtipo Luminal A**, seguido del subtipo Luminal B, ambos positivos para los receptores de estrógeno y progesterona. Los siguientes subtipos más comunes son Basal-like, que se corresponde con un triple negativo y HER2-Enriquecido, positivo pata el receptor HER2. El subtipo menos común es el normal-like que se caracteriza por mostrar patrones expresión génica similares a los del tejido mamario normal.
+
+Por otra parte, la **edad de diagnóstico** de los tumores HER2 enriquecido y normal-like es ligeramente más baja que la del resto de tumores. Además, los casos de HER2-enriquecido y luminal B son los que menos **supervivencia a largo plazo** presentan. Esto puede deberse a que estos tumores son agresivos por naturaleza. 
+
+En concreto, el subtipo HER2-enriquecido se caracteriza por una sobreexpresión del oncogén ERBB2 lo que provoca una división celular muy rápida, mayor grado histológico, mayor tendencia a generar metástasis tempranas y como vemos en la propia tabla, unos índices de hipoxia tumoral mucho más altos que los de otros tumores.Por su parte, los carcinomas Luminal B presentan niveles mucho más altos de genes proliferación, mayor inestabilidad cromosómica y menor expresión de receptores de progesterona.
+
+Por último, el **índice de hipoxia tumoral** es variable y depende del subtipo.
 
 ### Tabla 2: Distribución de subtipos por raza
+En esta segunda relación se pretende presentar la **distribución de los subtipos trabajados previamente por raza**. Para ello, hemos realizado un filtrado con objeto de seleccionar los cuatro grupos raciales definidos en el registro. 
+
+Despés de esto, hemos agrupado por raza y subtipo utilizando la función `group_by()`. De esta manera, hemos podido contabilizar el número de pacientes y ordenado ,finalmente, los resultados por raza y número de pacientes en orden descendiente. Además, también se ha generado un atributo que calcula cuánto pocentaje del total de casos dentro de la raza suponen los casos de ese subtipo.
 
 ```{r descriptivos-raza}
 tabla_razas <- datos_cruzados %>%
@@ -357,12 +380,17 @@ tabla_razas <- datos_cruzados %>%
   summarise(
     Num_pacientes = length(patientId)
   ) %>%
+   mutate(
+    Proporcion = round(Num_pacientes / sum(Num_pacientes) * 100, 2)
+  )%>%
   arrange(raza, desc(Num_pacientes))
 
 tabla_razas
 ```
+La representación racial dentro del estudio es dispar, siendo mucho más alto el número de pacientes blancas y casi nula la representación de indios americanos o nativos de Alaska. Al observar la distribución interna de cada grupo, destaca el hecho de que mientras en las pacientes blancas el subtipo Luminal A supera ampliamente al resto, en las pacientes negras o afroamericanas el subtipo Basal-like toma un peso relativo mucho mayor, igualándose prácticamente este, al peso del subtipo más común. Esto último refleja ciertas **disparidades raciales** en cuanto al desarrollo de cáncer de mama y los diferentes subtipos de este.
 
 ### Tabla 3: Clínica gdc
+Por último, se ha construido una tabla que refleja el **número de pacientes de cada subtipo que ha recibido radioterapia**. Para ello, se han agrupado los datos por subtipo y se ha presentado una relación en la que se han calculado el número de pacientes que lo presentan, así como el número de estos que han recibido un tratamiento de radioterapia y cuánto suponen estos pacientes en porcentaje.
 
 ```{r descriptivos-gdc}
 tabla_clinica_gdc <- datos_cruzados %>%
@@ -370,12 +398,13 @@ tabla_clinica_gdc <- datos_cruzados %>%
   summarise(
     Num_pacientes = length(patientId),
     Con_radioterapia = sum(radioterapia == "Yes", na.rm = TRUE),
-    Con_anotacion = sum(tiene_tratamiento_gdc == "Con anotación", na.rm = TRUE)
+    Porcentaje = round(Con_radioterapia / Num_pacientes * 100, 2)
   ) %>%
   arrange(desc(Num_pacientes))
 
 tabla_clinica_gdc
 ```
+Vemos que aproximadamente en todos los subtipos el **porcentaje de pacientes que reciben radioterapia es similar**, en torno al 50%, siendo algo más bajo el porcentaje en el subtipo HER2-enriquecido. Esto puede deberse, por un lado, a la presencia de valores ausentes y a que muchas pacientes son sometidas a una mastectomía total en estadios tempranos, cuando no hay ganglios afectados.Muchas veces estos casos no requieren radioterapia, lo que hace caer el porcentaje de mujeres que lo reciben.
 
 ## 4.2. Inestabilidad genómica por subtipo
 
@@ -545,17 +574,17 @@ sessionInfo()
 
 # 7. Referencias
 
-- Buffa, F. M., Harris, A. L., West, C. M., & Miller, C. J. (2010). Large meta-analysis of multiple cancers reveals a common, compact and highly prognostic hypoxia metagene. *British Journal of Cancer, 102*(2), 428–435. https://doi.org/10.1038/sj.bjc.6605450
-- Cancer Genome Atlas Network. (2012). Comprehensive molecular portraits of human breast tumours. *Nature, 490*(7418), 61–70. https://doi.org/10.1038/nature11412
-- Carey, L. A., Perou, C. M., Livasy, C. A., Dressler, L. G., Cowan, D., Conway, K., ... & Millikan, R. C. (2006). Race, breast cancer subtypes, and survival in the Carolina Breast Cancer Study. *JAMA, 295*(21), 2492–2502. https://doi.org/10.1001/jama.295.21.2492
-- Cerami, E., Gao, J., Dogrusoz, U., Gross, B. E., Sumer, S. O., Aksoy, B. A., ... & Schultz, N. (2012). The cBio cancer genomics portal: An open platform for exploring multidimensional cancer genomics data. *Cancer Discovery, 2*(5), 401–404. https://doi.org/10.1158/2159-8290.CD-12-0095
-- Gao, J., Aksoy, B. A., Dogrusoz, U., Dresdner, G., Gross, B., Sumer, S. O., ... & Schultz, N. (2013). Integrative analysis of complex cancer genomics and clinical profiles using the cBioPortal. *Science Signaling, 6*(269), pl1. https://doi.org/10.1126/scisignal.2004088
-- Grossman, R. L., Heath, A. P., Ferretti, V., Varmus, H. E., Lowy, D. R., Kibbe, W. A., & Staudt, L. M. (2016). Toward a shared vision for cancer genomic data. *New England Journal of Medicine, 375*(12), 1109–1112. https://doi.org/10.1056/NEJMp1607591
-- Hoadley, K. A., Yau, C., Hinoue, T., Wolf, D. M., Lazar, A. J., Drill, E., ... & Laird, P. W. (2018). Cell-of-origin patterns dominate the molecular classification of 10,000 tumors from 33 types of cancer. *Cell, 173*(2), 291–304. https://doi.org/10.1016/j.cell.2018.03.022
-- Lauby-Secretan, B., Scoccianti, C., Loomis, D., Grosse, Y., Bianchini, F., & Straif, K. (2016). Body fatness and cancer: Viewpoint of the IARC Working Group. *New England Journal of Medicine, 375*(8), 794–798. https://doi.org/10.1056/NEJMsr1606602
-- NCD Risk Factor Collaboration (NCD-RisC). (2024). Worldwide trends in underweight and obesity from 1990 to 2022: A pooled analysis of 3663 population-representative studies with 222 million children, adolescents, and adults. *The Lancet, 403*(10431), 1027–1050. https://doi.org/10.1016/S0140-6736(23)02750-2
-- Parker, J. S., Mullins, M., Cheang, M. C. U., Leung, S., Voduc, D., Vickery, T., ... & Bernard, P. S. (2009). Supervised risk predictor of breast cancer based on intrinsic subtypes. *Journal of Clinical Oncology, 27*(8), 1160–1167. https://doi.org/10.1200/JCO.2008.18.1370
-- Perou, C. M., Sørlie, T., Eisen, M. B., van de Rijn, M., Jeffrey, S. S., Rees, C. A., ... & Botstein, D. (2000). Molecular portraits of human breast tumours. *Nature, 406*(6797), 747–752. https://doi.org/10.1038/35021093
-- National Cancer Institute. (s.f.). *GDC Data Portal: TCGA-BRCA*. https://portal.gdc.cancer.gov/projects/TCGA-BRCA
-- Organización Mundial de la Salud. (s.f.). *Obesity among adults, BMI ≥ 30, prevalence (age-standardized estimate) (%)*. Global Health Observatory. https://www.who.int/data/gho
-- R Core Team. (2025). *R: A language and environment for statistical computing*. R Foundation for Statistical Computing. https://www.R-project.org/
+- Buffa, F. M., Harris, A. L., West, C. M., & Miller, C. J. (2010). Large meta-analysis of multiple cancers reveals a common, compact and highly prognostic hypoxia metagene. *British Journal of Cancer, 102*(2), 428–435. <https://doi.org/10.1038/sj.bjc.6605450>
+- Cancer Genome Atlas Network. (2012). Comprehensive molecular portraits of human breast tumours. *Nature, 490*(7418), 61–70. <https://doi.org/10.1038/nature11412>
+- Carey, L. A., Perou, C. M., Livasy, C. A., Dressler, L. G., Cowan, D., Conway, K., ... & Millikan, R. C. (2006). Race, breast cancer subtypes, and survival in the Carolina Breast Cancer Study. *JAMA, 295*(21), 2492–2502. <https://doi.org/10.1001/jama.295.21.2492>
+- Cerami, E., Gao, J., Dogrusoz, U., Gross, B. E., Sumer, S. O., Aksoy, B. A., ... & Schultz, N. (2012). The cBio cancer genomics portal: An open platform for exploring multidimensional cancer genomics data. *Cancer Discovery, 2*(5), 401–404. <https://doi.org/10.1158/2159-8290.CD-12-0095>
+- Gao, J., Aksoy, B. A., Dogrusoz, U., Dresdner, G., Gross, B., Sumer, S. O., ... & Schultz, N. (2013). Integrative analysis of complex cancer genomics and clinical profiles using the cBioPortal. *Science Signaling, 6*(269), pl1. <https://doi.org/10.1126/scisignal.2004088>
+- Grossman, R. L., Heath, A. P., Ferretti, V., Varmus, H. E., Lowy, D. R., Kibbe, W. A., & Staudt, L. M. (2016). Toward a shared vision for cancer genomic data. *New England Journal of Medicine, 375*(12), 1109–1112. <https://doi.org/10.1056/NEJMp1607591>
+- Hoadley, K. A., Yau, C., Hinoue, T., Wolf, D. M., Lazar, A. J., Drill, E., ... & Laird, P. W. (2018). Cell-of-origin patterns dominate the molecular classification of 10,000 tumors from 33 types of cancer. *Cell, 173*(2), 291–304. <https://doi.org/10.1016/j.cell.2018.03.022>
+- Lauby-Secretan, B., Scoccianti, C., Loomis, D., Grosse, Y., Bianchini, F., & Straif, K. (2016). Body fatness and cancer: Viewpoint of the IARC Working Group. *New England Journal of Medicine, 375*(8), 794–798. <https://doi.org/10.1056/NEJMsr1606602>
+- NCD Risk Factor Collaboration (NCD-RisC). (2024). Worldwide trends in underweight and obesity from 1990 to 2022: A pooled analysis of 3663 population-representative studies with 222 million children, adolescents, and adults. *The Lancet, 403*(10431), 1027–1050. [https://doi.org/10.1016/S0140-6736(23)02750-2](https://doi.org/10.1016/S0140-6736(23)02750-2){.uri}
+- Parker, J. S., Mullins, M., Cheang, M. C. U., Leung, S., Voduc, D., Vickery, T., ... & Bernard, P. S. (2009). Supervised risk predictor of breast cancer based on intrinsic subtypes. *Journal of Clinical Oncology, 27*(8), 1160–1167. <https://doi.org/10.1200/JCO.2008.18.1370>
+- Perou, C. M., Sørlie, T., Eisen, M. B., van de Rijn, M., Jeffrey, S. S., Rees, C. A., ... & Botstein, D. (2000). Molecular portraits of human breast tumours. *Nature, 406*(6797), 747–752. <https://doi.org/10.1038/35021093>
+- National Cancer Institute. (s.f.). *GDC Data Portal: TCGA-BRCA*. <https://portal.gdc.cancer.gov/projects/TCGA-BRCA>
+- Organización Mundial de la Salud. (s.f.). *Obesity among adults, BMI ≥ 30, prevalence (age-standardized estimate) (%)*. Global Health Observatory. <https://www.who.int/data/gho>
+- R Core Team. (2025). *R: A language and environment for statistical computing*. R Foundation for Statistical Computing. <https://www.R-project.org/>
