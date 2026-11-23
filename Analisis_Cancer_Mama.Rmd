@@ -116,8 +116,6 @@ cbio_raw <- get_clinical_by_study(study_id = "brca_tcga_pan_can_atlas_2018") %>%
   pivot_wider(names_from = clinicalAttributeId, values_from = value)
 names(cbio_raw)
 
-# EMERGENCIA LOCAL:
-  # cbio_raw <- read_tsv("INPUT/DATA/brca_tcga_clinical.tsv", show_col_types = FALSE)
 
 ```
 
@@ -147,8 +145,6 @@ gdc_raw <- as_tibble(gdc_resultados)
 # Verificamos cuántos pacientes (filas) y bloques de variables hemos descargado
 dim(gdc_raw)
 names(gdc_raw)
-#EMERGENCIA LOCAL:
-#gdc_raw <- fromJSON("INPUT/DATA/clinical_tcga_brca.json", flatten = TRUE) %>% as_tibble()
 
 ```
 
@@ -218,6 +214,7 @@ cbio_wide <- cbio_raw %>%
 str(cbio_wide)
 ```
 
+
 Para solucionar este problema, hemos convertido a tibble la tabla original. Después, tomamos los 12 primeros caracteres del ID del paciente y renombramos las variables para facilitar el entendimiento del conjunto de datos. Finalmente, hemos añadido una columna donde todos los registros tienen el valor USA con el fin de poder cruzar los datos georgráficos más adelante.
 
 ## 3.2. Limpieza de la OMS
@@ -246,10 +243,9 @@ El último paso antes de realizar el cruce de los datos es **aplanar y consolida
 - Se ha llevado a cabo la consolidación de los de diagnósticos y tratamientos; para ello se han desanidado las listas diagnoses y diagnoses_treatments con unnest(). A continuación, se han agrupado por patientId para extraer el primer estadio patológico disponible (estadio_gdc) y concatenado en una única cadena todos los tratamientos únicos recibidos por cada paciente (tratamientos).
 - Por último, se han combinado ambas tablas mediante left_join() usando patientId como clave, obteniendo una tabla que podemos integrar con el resto de fuentes.
 
-<div style="background-color: #fce4ec; border-left: 5px solid #801e5b; padding: 12px 16px; margin: 15px 0; border-radius: 4px;">
+::: {style="background-color: #fce4ec; border-left: 5px solid #801e5b; padding: 12px 16px; margin: 15px 0; border-radius: 4px;"}
 <strong>Importante:</strong> <code>unnest_wider()</code> despliega los datos demográficos en nuevas columnas, mientras que <code>unnest()</code> expande en varias filas los diagnósticos y tratamientos de cada paciente.
-</div>
-
+:::
 
 ```{r desanidado-gdc}
 library(tidyverse)
@@ -355,16 +351,18 @@ tabla_subtipos <- datos_cruzados %>%
 tabla_subtipos
 
 ```
+
 En la tabla anterior podemos observar un claro **predominio del subtipo Luminal A**, seguido del subtipo Luminal B, ambos positivos para los receptores de estrógeno y progesterona. Los siguientes subtipos más comunes son Basal-like, que se corresponde con un triple negativo y HER2-Enriquecido, positivo pata el receptor HER2. El subtipo menos común es el normal-like que se caracteriza por mostrar patrones expresión génica similares a los del tejido mamario normal.
 
-Por otra parte, la **edad de diagnóstico** de los tumores HER2 enriquecido y normal-like es ligeramente más baja que la del resto de tumores. Además, los casos de HER2-enriquecido y luminal B son los que menos **supervivencia a largo plazo** presentan. Esto puede deberse a que estos tumores son agresivos por naturaleza. 
+Por otra parte, la **edad de diagnóstico** de los tumores HER2 enriquecido y normal-like es ligeramente más baja que la del resto de tumores. Además, los casos de HER2-enriquecido y luminal B son los que menos **supervivencia a largo plazo** presentan. Esto puede deberse a que estos tumores son agresivos por naturaleza.
 
 En concreto, el subtipo HER2-enriquecido se caracteriza por una sobreexpresión del oncogén ERBB2 lo que provoca una división celular muy rápida, mayor grado histológico, mayor tendencia a generar metástasis tempranas y como vemos en la propia tabla, unos índices de hipoxia tumoral mucho más altos que los de otros tumores.Por su parte, los carcinomas Luminal B presentan niveles mucho más altos de genes proliferación, mayor inestabilidad cromosómica y menor expresión de receptores de progesterona.
 
 Por último, el **índice de hipoxia tumoral** es variable y depende del subtipo.
 
 ### Tabla 2: Distribución de subtipos por raza
-En esta segunda relación se pretende presentar la **distribución de los subtipos trabajados previamente por raza**. Para ello, hemos realizado un filtrado con objeto de seleccionar los cuatro grupos raciales definidos en el registro. 
+
+En esta segunda relación se pretende presentar la **distribución de los subtipos trabajados previamente por raza**. Para ello, hemos realizado un filtrado con objeto de seleccionar los cuatro grupos raciales definidos en el registro.
 
 Despés de esto, hemos agrupado por raza y subtipo utilizando la función `group_by()`. De esta manera, hemos podido contabilizar el número de pacientes y ordenado ,finalmente, los resultados por raza y número de pacientes en orden descendiente. Además, también se ha generado un atributo que calcula cuánto pocentaje del total de casos dentro de la raza suponen los casos de ese subtipo.
 
@@ -387,9 +385,11 @@ tabla_razas <- datos_cruzados %>%
 
 tabla_razas
 ```
+
 La representación racial dentro del estudio es dispar, siendo mucho más alto el número de pacientes blancas y casi nula la representación de indios americanos o nativos de Alaska. Al observar la distribución interna de cada grupo, destaca el hecho de que mientras en las pacientes blancas el subtipo Luminal A supera ampliamente al resto, en las pacientes negras o afroamericanas el subtipo Basal-like toma un peso relativo mucho mayor, igualándose prácticamente este, al peso del subtipo más común. Esto último refleja ciertas **disparidades raciales** en cuanto al desarrollo de cáncer de mama y los diferentes subtipos de este.
 
 ### Tabla 3: Clínica gdc
+
 Por último, se ha construido una tabla que refleja el **número de pacientes de cada subtipo que ha recibido radioterapia**. Para ello, se han agrupado los datos por subtipo y se ha presentado una relación en la que se han calculado el número de pacientes que lo presentan, así como el número de estos que han recibido un tratamiento de radioterapia y cuánto suponen estos pacientes en porcentaje.
 
 ```{r descriptivos-gdc}
@@ -404,6 +404,7 @@ tabla_clinica_gdc <- datos_cruzados %>%
 
 tabla_clinica_gdc
 ```
+
 Vemos que aproximadamente en todos los subtipos el **porcentaje de pacientes que reciben radioterapia es similar**, en torno al 50%, siendo algo más bajo el porcentaje en el subtipo HER2-enriquecido. Esto puede deberse, por un lado, a la presencia de valores ausentes y a que muchas pacientes son sometidas a una mastectomía total en estadios tempranos, cuando no hay ganglios afectados.Muchas veces estos casos no requieren radioterapia, lo que hace caer el porcentaje de mujeres que lo reciben.
 
 ## 4.2. Inestabilidad genómica por subtipo
